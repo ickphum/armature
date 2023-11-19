@@ -1,46 +1,22 @@
 package com.ickphum.armature
 
+import android.app.Activity
+import android.content.Context
+import android.opengl.GLES20
+import android.opengl.GLSurfaceView
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.ickphum.armature.ui.theme.ArmatureTheme
+import javax.microedition.khronos.opengles.GL10
 
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
+class MainActivity : Activity() {
+
+    private lateinit var gLView: SurfaceView
+
+    public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            ArmatureTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Greeting("Android")
-                }
-            }
-        }
-    }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    ArmatureTheme {
-        Greeting("Android")
+        // Create a GLSurfaceView instance and set it
+        // as the ContentView for this Activity.
+        gLView = SurfaceView(this)
+        setContentView(gLView)
     }
 }
