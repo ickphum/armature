@@ -8,9 +8,12 @@ import android.opengl.GLES20
 // number of coordinates per vertex in this array
 const val COORDS_PER_VERTEX = 3
 var triangleCoords = floatArrayOf(     // in counterclockwise order:
-    0.0f, 0.62200844f, 0.0f,      // top
-    -0.5f, -0.31100425f, 0.0f,    // bottom left
-    0.5f, -0.31100425f, 0.0f      // bottom right
+//    0.0f, 0.62200844f, 0.0f,      // top
+//    -0.5f, -0.31100425f, 0.0f,    // bottom left
+//    0.5f, -0.31100425f, 0.0f      // bottom right
+    0.5f, 0.8f, 0.0f,      // top
+    0.3f, 0.3f, 0.0f,    // bottom left
+    0.7f, 0.3f, 0.0f      // bottom right
 )
 
 class Triangle {

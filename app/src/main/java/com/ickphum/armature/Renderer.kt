@@ -3,8 +3,10 @@ package com.ickphum.armature
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
-import android.os.SystemClock
+import android.util.Log
+import com.ickphum.armature.Geometry.Sphere
 import javax.microedition.khronos.opengles.GL10
+
 
 class Renderer : GLSurfaceView.Renderer {
 
@@ -14,12 +16,17 @@ class Renderer : GLSurfaceView.Renderer {
     private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
     private val rotationMatrix = FloatArray(16)
+    private val invertedVPMatrix = FloatArray(16)
+
+    private val tag: String = "RENDER"
+
+    private var malletPressed: Boolean = false
 
     @Volatile
     var angle: Float = 0f
 
     override fun onSurfaceCreated(p0: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
-        GLES20.glClearColor(0.0f, 0.5f, 0.0f, 1.0f)
+        GLES20.glClearColor(0.0f, 0.0f, 0.5f, 1.0f)
 
         mTriangle = Triangle()
     }
@@ -45,6 +52,9 @@ class Renderer : GLSurfaceView.Renderer {
         // for the matrix multiplication product to be correct.
         Matrix.multiplyMM(scratch, 0, vPMatrix, 0, rotationMatrix, 0)
 
+        // invert matrix for touch interpretation
+        Matrix.invertM(invertedVPMatrix, 0, scratch, 0);
+
         mTriangle.draw( scratch )
     }
 
@@ -56,6 +66,63 @@ class Renderer : GLSurfaceView.Renderer {
         // this projection matrix is applied to object coordinates
         // in the onDrawFrame() method
         Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1f, 1f, 3f, 7f)
+    }
+
+    private fun divideByW(vector: FloatArray) {
+        vector[0] /= vector[3]
+        vector[1] /= vector[3]
+        vector[2] /= vector[3]
+    }
+
+    private fun convertNormalized2DPointToRay(
+        normalizedX: Float, normalizedY: Float
+    ): Geometry.Ray {
+        // We'll convert these normalized device coordinates into world-space
+        // coordinates. We'll pick a point on the near and far planes, and draw a
+        // line between them. To do this transform, we need to first multiply by
+        // the inverse matrix, and then we need to undo the perspective divide.
+        val nearPointNdc = floatArrayOf(normalizedX, normalizedY, -1f, 1f)
+        val farPointNdc = floatArrayOf(normalizedX, normalizedY, 1f, 1f)
+        val nearPointWorld = FloatArray(4)
+        val farPointWorld = FloatArray(4)
+        Matrix.multiplyMV(
+            nearPointWorld, 0, invertedVPMatrix, 0, nearPointNdc, 0
+        )
+        Matrix.multiplyMV(
+            farPointWorld, 0, invertedVPMatrix, 0, farPointNdc, 0
+        )
+
+        // Why are we dividing by W? We multiplied our vector by an inverse
+        // matrix, so the W value that we end up is actually the *inverse* of
+        // what the projection matrix would create. By dividing all 3 components
+        // by W, we effectively undo the hardware perspective divide.
+        divideByW(nearPointWorld)
+        divideByW(farPointWorld)
+
+        // We don't care about the W value anymore, because our points are now
+        // in world coordinates.
+        val nearPointRay = Geometry.Point(nearPointWorld[0], nearPointWorld[1], nearPointWorld[2])
+        val farPointRay = Geometry.Point(farPointWorld[0], farPointWorld[1], farPointWorld[2])
+        return Geometry.Ray(
+            nearPointRay,
+            Geometry.vectorBetween(nearPointRay, farPointRay)
+        )
+    }
+
+    fun handleMoveEvent(normalizedX: Float, normalizedY: Float) {
+//        Log.d( tag, "handleMoveEvent %.1f, %.1f".format( normalizedX, normalizedY ))
+    }
+
+    fun handleDownEvent(normalizedX: Float, normalizedY: Float) {
+        Log.d( tag, "handleDownEvent %.1f, %.1f".format( normalizedX, normalizedY ))
+
+        val ray: Geometry.Ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+
+        val boundingSphere = Sphere( Geometry.Point(0.5f, 0.5f, 0f),0.2f )
+
+        malletPressed = Geometry.intersects(boundingSphere, ray);
+        if ( malletPressed )
+            Log.d( tag, "Pressed!")
     }
 
     companion object {

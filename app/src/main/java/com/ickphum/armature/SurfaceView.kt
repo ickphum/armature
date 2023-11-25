@@ -2,7 +2,9 @@ package com.ickphum.armature
 
 import android.content.Context
 import android.opengl.GLSurfaceView
+import android.util.Log
 import android.view.MotionEvent
+import kotlinx.coroutines.Runnable
 
 private const val TOUCH_SCALE_FACTOR: Float = 180.0f / 320f
 
@@ -35,8 +37,21 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
         val x: Float = e.x
         val y: Float = e.y
 
+        val normalizedX: Float = x / width * 2 - 1
+        val normalizedY: Float = -(y / height * 2 - 1)
+
         when (e.action) {
+            MotionEvent.ACTION_DOWN -> {
+                queueEvent(Runnable {
+                    renderer.handleDownEvent( normalizedX, normalizedY)
+                })
+            }
             MotionEvent.ACTION_MOVE -> {
+
+//                Log.d( "TOUCH", "move to %.1f, %.1f".format( x, y ))
+                queueEvent(Runnable {
+                    renderer.handleMoveEvent( normalizedX, normalizedY)
+                })
 
                 var dx: Float = x - previousX
                 var dy: Float = y - previousY
