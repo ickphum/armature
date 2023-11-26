@@ -19,13 +19,13 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
         // Create an OpenGL ES 2.0 context
         setEGLContextClientVersion(2)
 
-        renderer = Renderer()
+        renderer = Renderer( context )
 
         // Set the Renderer for drawing on the GLSurfaceView
         setRenderer(renderer)
 
         // Render the view only when there is a change in the drawing data.
-        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+//        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
 
     }
 
@@ -53,21 +53,21 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
                     renderer.handleMoveEvent( normalizedX, normalizedY)
                 })
 
-                var dx: Float = x - previousX
-                var dy: Float = y - previousY
-
-                // reverse direction of rotation above the mid-line
-                if (y > height / 2) {
-                    dx *= -1
-                }
-
-                // reverse direction of rotation to left of the mid-line
-                if (x < width / 2) {
-                    dy *= -1
-                }
-
-                renderer.angle += (dx + dy) * TOUCH_SCALE_FACTOR
-                requestRender()
+//                var dx: Float = x - previousX
+//                var dy: Float = y - previousY
+//
+//                // reverse direction of rotation above the mid-line
+//                if (y > height / 2) {
+//                    dx *= -1
+//                }
+//
+//                // reverse direction of rotation to left of the mid-line
+//                if (x < width / 2) {
+//                    dy *= -1
+//                }
+//
+//                renderer.angle += (dx + dy) * TOUCH_SCALE_FACTOR
+//                requestRender()
             }
         }
 
