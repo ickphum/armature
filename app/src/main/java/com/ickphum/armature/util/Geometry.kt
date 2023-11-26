@@ -1,4 +1,4 @@
-package com.ickphum.armature
+package com.ickphum.armature.util
 
 import kotlin.math.sqrt
 

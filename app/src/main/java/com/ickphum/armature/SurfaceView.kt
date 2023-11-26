@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import kotlinx.coroutines.Runnable
 
 private const val TOUCH_SCALE_FACTOR: Float = 180.0f / 320f
+private const val TAG = "SurfaceView"
 
 class SurfaceView(context: Context) : GLSurfaceView(context) {
 
@@ -42,33 +43,21 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
 
         when (e.action) {
             MotionEvent.ACTION_DOWN -> {
-                queueEvent(Runnable {
-                    renderer.handleDownEvent( normalizedX, normalizedY)
-                })
-            }
-            MotionEvent.ACTION_MOVE -> {
+                Log.d( "TOUCH", "down at %.1f, %.1f".format( x, y ))
 
+            }
+
+//                queueEvent(Runnable {
+//                    renderer.handleDownEvent( normalizedX, normalizedY)
+//                })
+//            }
+//            MotionEvent.ACTION_MOVE -> {
 //                Log.d( "TOUCH", "move to %.1f, %.1f".format( x, y ))
-                queueEvent(Runnable {
-                    renderer.handleMoveEvent( normalizedX, normalizedY)
-                })
+//                queueEvent(Runnable {
+//                    renderer.handleMoveEvent( normalizedX, normalizedY)
+//                })
+//            }
 
-//                var dx: Float = x - previousX
-//                var dy: Float = y - previousY
-//
-//                // reverse direction of rotation above the mid-line
-//                if (y > height / 2) {
-//                    dx *= -1
-//                }
-//
-//                // reverse direction of rotation to left of the mid-line
-//                if (x < width / 2) {
-//                    dy *= -1
-//                }
-//
-//                renderer.angle += (dx + dy) * TOUCH_SCALE_FACTOR
-//                requestRender()
-            }
         }
 
         previousX = x
