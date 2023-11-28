@@ -12,6 +12,7 @@ open class ShaderProgram( context: Context, vertexShaderSourceFileName: String, 
     protected val A_POSITION = "a_Position"
     protected val A_COLOR = "a_Color"
     protected val A_TEXTURE_COORDINATES = "a_TextureCoordinates"
+    protected val U_COLOR = "u_Color"
 
     protected var program =
         ShaderHelper.buildProgram(context, vertexShaderSourceFileName, fragmentShaderSourceFileName)

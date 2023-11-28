@@ -17,11 +17,18 @@ class Geometry {
                 z + vector.z
             )
         }
+        override fun toString(): String {
+            return "Point[ $x, $y, $z ]"
+        }
     }
 
     class Circle(val center: Point, val radius: Float) {
         fun scale(scale: Float): Circle {
             return Circle(center, radius * scale)
+        }
+
+        override fun toString(): String {
+            return "Circle[ c $center, r $radius ]"
         }
     }
 
@@ -40,15 +47,27 @@ class Geometry {
                 x * other.y - y * other.x
             )
         }
+
+        fun dotProduct(other: com.ickphum.armature.util.Geometry.Vector): Float {
+            return x * other.x + y * other.y + z * other.z
+        }
+
+        fun scale(f: Float): com.ickphum.armature.util.Geometry.Vector {
+            return com.ickphum.armature.util.Geometry.Vector(
+                x * f,
+                y * f,
+                z * f
+            )
+        }
     }
     class Ray(val point: Point, val vector: Vector)
 
     class Sphere(val center: Point, val radius: Float)
 
+    class Plane(val point: Point, val normal: Vector)
 
 
-
-    companion object Helpers {
+    companion object Helper {
         fun vectorBetween(from: Point, to: Point): Vector {
             return Vector(
                 to.x - from.x,
@@ -78,6 +97,14 @@ class Geometry {
         fun intersects(sphere: Sphere, ray: Ray): Boolean {
             return distanceBetween(sphere.center, ray) < sphere.radius
         }
+
+        fun intersectionPoint(ray: Ray, plane: Plane): Point {
+            val rayToPlaneVector = vectorBetween(ray.point, plane.point)
+            val scaleFactor: Float = (rayToPlaneVector.dotProduct(plane.normal)
+                    / ray.vector.dotProduct(plane.normal))
+            return ray.point.translate(ray.vector.scale(scaleFactor))
+        }
+
 
     }
 }

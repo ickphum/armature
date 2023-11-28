@@ -26,7 +26,7 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
         setRenderer(renderer)
 
         // Render the view only when there is a change in the drawing data.
-//        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
 
     }
 
@@ -43,20 +43,15 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
 
         when (e.action) {
             MotionEvent.ACTION_DOWN -> {
-                Log.d( "TOUCH", "down at %.1f, %.1f".format( x, y ))
-
+                queueEvent(Runnable {
+                    renderer.handleTouchPress( normalizedX, normalizedY)
+                })
             }
-
-//                queueEvent(Runnable {
-//                    renderer.handleDownEvent( normalizedX, normalizedY)
-//                })
-//            }
-//            MotionEvent.ACTION_MOVE -> {
-//                Log.d( "TOUCH", "move to %.1f, %.1f".format( x, y ))
-//                queueEvent(Runnable {
-//                    renderer.handleMoveEvent( normalizedX, normalizedY)
-//                })
-//            }
+            MotionEvent.ACTION_MOVE -> {
+                queueEvent(Runnable {
+                    renderer.handleTouchDrag( normalizedX, normalizedY)
+                })
+            }
 
         }
 

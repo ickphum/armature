@@ -1,12 +1,10 @@
-package com.ickphum.armature.data
+package com.ickphum.armature.objects
 
 import android.opengl.GLES20.GL_TRIANGLE_FAN
 import android.opengl.GLES20.glDrawArrays
 import com.ickphum.armature.Constants.BYTES_PER_FLOAT
+import com.ickphum.armature.data.VertexArray
 import com.ickphum.armature.programs.TextureShaderProgram
-
-
-
 
 private const val POSITION_COMPONENT_COUNT = 2
 private const val TEXTURE_COORDINATES_COMPONENT_COUNT = 2
