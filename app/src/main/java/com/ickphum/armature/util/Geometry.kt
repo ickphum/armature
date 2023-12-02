@@ -104,7 +104,9 @@ class Geometry {
                     / ray.vector.dotProduct(plane.normal))
             return ray.point.translate(ray.vector.scale(scaleFactor))
         }
-
+        fun clamp(value: Float, min: Float, max: Float): Float {
+            return max.coerceAtMost(value.coerceAtLeast(min))
+        }
 
     }
 }

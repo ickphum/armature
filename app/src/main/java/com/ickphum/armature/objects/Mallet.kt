@@ -8,7 +8,7 @@ import com.ickphum.armature.util.Geometry
 
 private const val POSITION_COMPONENT_COUNT = 3
 
-class Mallet(private val radius: Float, public val height: Float, numPointsAroundMallet: Int ) {
+class Mallet(public val radius: Float, public val height: Float, numPointsAroundMallet: Int ) {
 
     private val generatedData = ObjectBuilder.createMallet(
         Geometry.Point(

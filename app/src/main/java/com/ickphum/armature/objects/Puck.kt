@@ -7,7 +7,7 @@ import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.Geometry.Cylinder
 
 private const val POSITION_COMPONENT_COUNT = 3
-class Puck(private val radius: Float, public val height: Float, numPointsAroundPuck: Int) {
+class Puck(public val radius: Float, public val height: Float, numPointsAroundPuck: Int) {
 
     private val generatedData = ObjectBuilder.createPuck(
         Cylinder(

@@ -1,7 +1,6 @@
 package com.ickphum.armature
 
 import android.content.Context
-import android.media.Image.Plane
 import android.opengl.GLES20.GL_COLOR_BUFFER_BIT
 import android.opengl.GLES20.glClear
 import android.opengl.GLES20.glClearColor
@@ -21,11 +20,16 @@ import com.ickphum.armature.objects.Table
 import com.ickphum.armature.programs.ColorShaderProgram
 import com.ickphum.armature.programs.TextureShaderProgram
 import com.ickphum.armature.util.Geometry
+import com.ickphum.armature.util.Geometry.Helper.clamp
 import com.ickphum.armature.util.TextureHelper
 import javax.microedition.khronos.opengles.GL10
 
 
 private const val TAG = "ArmRenderer"
+private const val leftBound = -0.5f
+private const val rightBound = 0.5f
+private const val farBound = -0.8f
+private const val nearBound = 0.8f
 
 class Renderer(context: Context) : GLSurfaceView.Renderer {
 
@@ -48,6 +52,9 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
     private var malletPressed = false
     private lateinit var blueMalletPosition: Geometry.Point
+    private lateinit var previousBlueMalletPosition: Geometry.Point
+    private lateinit var puckPosition: Geometry.Point
+    private lateinit var puckVector: Geometry.Vector
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
@@ -57,6 +64,10 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         puck = Puck(0.06f, 0.02f, 32)
 
         blueMalletPosition = Geometry.Point(0f, mallet.height / 2f, 0.4f)
+        previousBlueMalletPosition = blueMalletPosition
+
+        puckPosition = Geometry.Point(0f, puck.height / 2f, 0f)
+        puckVector = Geometry.Vector(0f, 0f, 0f)
 
         textureProgram = TextureShaderProgram(context)
         colorProgram = ColorShaderProgram(context)
@@ -106,8 +117,28 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         // different color.
         mallet.draw();
 
+        puckPosition = puckPosition.translate(puckVector)
+        if (puckPosition.x < leftBound + puck.radius || puckPosition.x > rightBound - puck.radius )
+        {
+            puckVector = Geometry.Vector(-puckVector.x, puckVector.y, puckVector.z)
+            puckVector = puckVector.scale(0.99f);
+        }
+        if (puckPosition.z < farBound + puck.radius || puckPosition.z > nearBound - puck.radius )
+        {
+            puckVector = Geometry.Vector(puckVector.x, puckVector.y, -puckVector.z)
+            puckVector = puckVector.scale(0.99f);
+
+        }
+
+        // Clamp the puck position.
+        puckPosition = Geometry.Point(
+            clamp(puckPosition.x, leftBound + puck.radius, rightBound - puck.radius),
+            puckPosition.y,
+            clamp(puckPosition.z, farBound + puck.radius, nearBound - puck.radius)
+        )
+
         // Draw the puck.
-        positionObjectInScene(0f, puck.height / 2f, 0f);
+        positionObjectInScene(puckPosition.x, puckPosition.y, puckPosition.z);
         colorProgram.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f);
         puck.bindData(colorProgram);
         puck.draw();
@@ -154,7 +185,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     }
 
     fun handleTouchDrag(normalizedX: Float, normalizedY: Float) {
-        Log.d( TAG, "handleTouchDrag %.1f, %.1f".format( normalizedX, normalizedY ))
+//        Log.d( TAG, "handleTouchDrag %.1f, %.1f".format( normalizedX, normalizedY ))
         if (malletPressed) {
             val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
             // Define a plane representing our air hockey table.
@@ -162,15 +193,21 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             // Find out where the touched point intersects the plane
 // representing our table. We'll move the mallet along this plane.
             val touchedPoint: Geometry.Point = Geometry.intersectionPoint(ray, plane)
-            blueMalletPosition = Geometry.Point(touchedPoint.x, mallet.height / 2f, touchedPoint.z)
-            Log.d( TAG, "New drag pos: ")
+            blueMalletPosition = Geometry.Point(
+                Geometry.clamp(touchedPoint.x,leftBound + mallet.radius,rightBound - mallet.radius),
+                mallet.height / 2f,
+                Geometry.clamp(touchedPoint.z,0f + mallet.radius,nearBound - mallet.radius))
+
+            val distance = Geometry.vectorBetween(blueMalletPosition, puckPosition).length()
+            if (distance < puck.radius + mallet.radius) {
+                // The mallet has struck the puck. Now send the puck flying based on the mallet velocity.
+                puckVector = Geometry.vectorBetween( previousBlueMalletPosition, blueMalletPosition )
+            }
         }
-        else
-            Log.d( TAG, "Not pressed" )
     }
 
     fun handleTouchPress(normalizedX: Float, normalizedY: Float) {
-        Log.d( TAG, "handleTouchPress %.1f, %.1f".format( normalizedX, normalizedY ))
+//        Log.d( TAG, "handleTouchPress %.1f, %.1f".format( normalizedX, normalizedY ))
 
         val ray: Geometry.Ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
 
