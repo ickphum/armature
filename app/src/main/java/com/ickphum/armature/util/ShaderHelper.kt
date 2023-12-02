@@ -1,6 +1,7 @@
 package com.ickphum.armature.util
 
 import android.content.Context
+import android.content.res.Resources
 import android.opengl.GLES20.GL_COMPILE_STATUS
 import android.opengl.GLES20.GL_FRAGMENT_SHADER
 import android.opengl.GLES20.GL_LINK_STATUS
@@ -23,22 +24,20 @@ import android.opengl.GLES20.glValidateProgram
 import android.util.Log
 import com.ickphum.armature.util.Logging.Helper.checkError
 
-
 private const val TAG = "ShaderHelper"
 
 class ShaderHelper {
 
-
-
     companion object Helper {
-        private fun compileShader(context: Context, type: Int, sourceFileName: String): Int {
+        private fun compileShader(context: Context, type: Int, sourceResourceId: Int): Int {
             val shaderObjectId = glCreateShader(type);
             if (shaderObjectId == 0) {
                 Log.w(TAG, "Could not create new shader.");
                 return 0;
             }
 
-            val rawText = context.assets.open(sourceFileName)
+            val rawText = context.resources.openRawResource( sourceResourceId )
+//            val rawText = context.assets.open(sourceFileName)
             val shaderString = rawText.bufferedReader().use { it.readText() }
             Log.w( TAG, shaderString )
 
@@ -47,7 +46,7 @@ class ShaderHelper {
 
             val compileStatus = IntArray(1)
             glGetShaderiv(shaderObjectId, GL_COMPILE_STATUS, compileStatus, 0)
-            Log.v(TAG, "Results of compiling source:" + "\n" + sourceFileName + "\n:" + glGetShaderInfoLog(shaderObjectId));
+            Log.v(TAG, "Results of compiling source:" + "\n" + sourceResourceId + "\n:" + glGetShaderInfoLog(shaderObjectId));
             if (compileStatus[0] == 0) {
                 // If it failed, delete the shader object.
                 glDeleteShader(shaderObjectId);
@@ -56,15 +55,15 @@ class ShaderHelper {
             }
             return shaderObjectId;
         }
-        fun compileVertexShader(context: Context, sourceFileName: String): Int {
-            return compileShader(context, GL_VERTEX_SHADER, sourceFileName)
+        private fun compileVertexShader(context: Context, sourceResourceId: Int): Int {
+            return compileShader(context, GL_VERTEX_SHADER, sourceResourceId)
         }
 
-        fun compileFragmentShader(context: Context, sourceFileName: String): Int {
-            return compileShader(context, GL_FRAGMENT_SHADER, sourceFileName)
+        private fun compileFragmentShader(context: Context, sourceResourceId: Int): Int {
+            return compileShader(context, GL_FRAGMENT_SHADER, sourceResourceId)
         }
 
-        fun linkProgram(vertexShaderId: Int, fragmentShaderId: Int): Int {
+        private fun linkProgram(vertexShaderId: Int, fragmentShaderId: Int): Int {
             val programObjectId = glCreateProgram();
             if (programObjectId == 0) {
                 Log.w(TAG, "Could not create new program");
@@ -86,7 +85,7 @@ class ShaderHelper {
             return programObjectId;
         }
 
-        fun validateProgram(programObjectId: Int): Boolean {
+        private fun validateProgram(programObjectId: Int): Boolean {
             glValidateProgram(programObjectId)
             val validateStatus = IntArray(1)
             glGetProgramiv(programObjectId, GL_VALIDATE_STATUS, validateStatus, 0)
@@ -101,13 +100,13 @@ class ShaderHelper {
 
         fun buildProgram(
             context: Context,
-            vertexShaderSourceFileName: String,
-            fragmentShaderSourceFileName: String
+            vertexShaderResourceId: Int,
+            fragmentShaderResourceId: Int
         ): Int {
             val program: Int
             // Compile the shaders.
-            val vertexShader = compileVertexShader(context, vertexShaderSourceFileName)
-            val fragmentShader = compileFragmentShader(context, fragmentShaderSourceFileName)
+            val vertexShader = compileVertexShader(context, vertexShaderResourceId)
+            val fragmentShader = compileFragmentShader(context, fragmentShaderResourceId)
             // Link them into a shader program.
             program = linkProgram(vertexShader, fragmentShader)
             validateProgram(program)

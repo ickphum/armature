@@ -5,10 +5,11 @@ import android.opengl.GLES20.glGetAttribLocation
 import android.opengl.GLES20.glGetUniformLocation
 import android.opengl.GLES20.glUniform4f
 import android.opengl.GLES20.glUniformMatrix4fv
+import com.ickphum.armature.R
 
 
 class ColorShaderProgram(context: Context)
-    : ShaderProgram( context, "simple_vertex_shader.glsl", "simple_fragment_shader.glsl" ) {
+    : ShaderProgram( context, R.raw.simple_vertex_shader, R.raw.simple_fragment_shader ) {
     // Uniform locations
     private val uMatrixLocation = glGetUniformLocation(program, U_MATRIX)
 

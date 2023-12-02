@@ -71,11 +71,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         textureProgram = TextureShaderProgram(context)
         colorProgram = ColorShaderProgram(context)
-        texture = TextureHelper.loadTexture(context, context.resources.getIdentifier(
-            "air_hockey_surface",
-            "drawable",
-            context.packageName
-        ))
+        texture = TextureHelper.loadTexture(context, R.drawable.air_hockey_surface )
     }
 
     override fun onSurfaceChanged(unused: GL10, width: Int, height: Int) {

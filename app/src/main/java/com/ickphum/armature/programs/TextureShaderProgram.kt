@@ -9,10 +9,11 @@ import android.opengl.GLES20.glGetAttribLocation
 import android.opengl.GLES20.glGetUniformLocation
 import android.opengl.GLES20.glUniform1i
 import android.opengl.GLES20.glUniformMatrix4fv
+import com.ickphum.armature.R
 
 
 class TextureShaderProgram(context: Context)
-    : ShaderProgram( context, "texture_vertex_shader.glsl", "texture_fragment_shader.glsl" )
+    : ShaderProgram( context, R.raw.texture_vertex_shader, R.raw.texture_fragment_shader )
 {
     // Uniform locations
     private var uMatrixLocation = glGetUniformLocation(program, U_MATRIX)

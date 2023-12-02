@@ -4,7 +4,8 @@ import android.content.Context
 import android.opengl.GLES20.glUseProgram
 import com.ickphum.armature.util.ShaderHelper
 
-open class ShaderProgram( context: Context, vertexShaderSourceFileName: String, fragmentShaderSourceFileName: String) {
+open class ShaderProgram( context: Context, vertexShaderResourceId: Int, fragmentShaderResourceId: Int) {
+
     protected val U_MATRIX = "u_Matrix"
     protected val U_TEXTURE_UNIT = "u_TextureUnit"
 
@@ -15,7 +16,7 @@ open class ShaderProgram( context: Context, vertexShaderSourceFileName: String, 
     protected val U_COLOR = "u_Color"
 
     protected var program =
-        ShaderHelper.buildProgram(context, vertexShaderSourceFileName, fragmentShaderSourceFileName)
+        ShaderHelper.buildProgram(context, vertexShaderResourceId, fragmentShaderResourceId)
 
     open fun useProgram() {
         // Set the current OpenGL shader program to this program.
