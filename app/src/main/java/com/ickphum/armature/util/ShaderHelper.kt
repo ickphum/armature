@@ -24,6 +24,7 @@ import android.opengl.GLES20.glValidateProgram
 import android.util.Log
 import com.ickphum.armature.util.Logging.Helper.checkError
 
+
 private const val TAG = "ShaderHelper"
 
 class ShaderHelper {

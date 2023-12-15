@@ -59,6 +59,10 @@ class Geometry {
                 z * f
             )
         }
+
+        fun normalize(): com.ickphum.armature.util.Geometry.Vector {
+            return scale(1f / length())
+        }
     }
     class Ray(val point: Point, val vector: Vector)
 
@@ -105,6 +109,10 @@ class Geometry {
             return ray.point.translate(ray.vector.scale(scaleFactor))
         }
         fun clamp(value: Float, min: Float, max: Float): Float {
+            return max.coerceAtMost(value.coerceAtLeast(min))
+        }
+
+        fun intClamp(value: Int, min: Int, max: Int): Int {
             return max.coerceAtMost(value.coerceAtLeast(min))
         }
 

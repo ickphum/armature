@@ -14,7 +14,6 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
     private val renderer: com.ickphum.armature.Renderer
     private var previousX: Float = 0f
     private var previousY: Float = 0f
-
     init {
 
         // Create an OpenGL ES 2.0 context
@@ -29,7 +28,6 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
 //        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
 
     }
-
     override fun onTouchEvent(e: MotionEvent): Boolean {
         // MotionEvent reports input details from the touch screen
         // and other input controls. In this case, you are only
@@ -38,26 +36,22 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
         val x: Float = e.x
         val y: Float = e.y
 
-        val normalizedX: Float = x / width * 2 - 1
-        val normalizedY: Float = -(y / height * 2 - 1)
-
         when (e.action) {
             MotionEvent.ACTION_DOWN -> {
-                queueEvent(Runnable {
-                    renderer.handleTouchPress( normalizedX, normalizedY)
-                })
+                previousX = x
+                previousY = y
             }
             MotionEvent.ACTION_MOVE -> {
+                val deltaX = previousX - x
+                val deltaY = previousY - y
                 queueEvent(Runnable {
-                    renderer.handleTouchDrag( normalizedX, normalizedY)
+                    renderer.handleTouchDrag( -deltaX, -deltaY)
                 })
+                previousX = x
+                previousY = y
             }
-
         }
 
-        previousX = x
-        previousY = y
         return true
     }
-
 }
