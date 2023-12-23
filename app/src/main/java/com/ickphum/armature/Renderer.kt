@@ -1,7 +1,6 @@
 package com.ickphum.armature
 
 import android.content.Context
-import android.graphics.Color
 import android.opengl.GLES20.GL_BLEND
 import android.opengl.GLES20.GL_COLOR_BUFFER_BIT
 import android.opengl.GLES20.GL_DEPTH_BUFFER_BIT
@@ -13,7 +12,6 @@ import android.opengl.GLES20.glBlendFunc
 import android.opengl.GLES20.glClear
 import android.opengl.GLES20.glClearColor
 import android.opengl.GLES20.glDepthFunc
-import android.opengl.GLES20.glDepthMask
 import android.opengl.GLES20.glDisable
 import android.opengl.GLES20.glEnable
 import android.opengl.GLES20.glViewport
@@ -24,19 +22,13 @@ import android.opengl.Matrix.rotateM
 import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
-import android.util.Log
 import com.ickphum.armature.objects.Base
-import com.ickphum.armature.objects.ParticleShooter
-import com.ickphum.armature.objects.ParticleSystem
 import com.ickphum.armature.objects.Skybox
 import com.ickphum.armature.programs.BaseShaderProgram
-import com.ickphum.armature.programs.ParticleShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
-import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.TextureHelper
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.floor
-
 
 private const val TAG = "3DRenderer"
 
@@ -55,16 +47,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private val modelViewMatrix = FloatArray(16)
     private val itModelViewMatrix = FloatArray(16)
 
-    private lateinit var particleProgram: ParticleShaderProgram
-    private lateinit var particleSystem: ParticleSystem
-    private lateinit var redParticleShooter: ParticleShooter
-    private lateinit var greenParticleShooter: ParticleShooter
-    private lateinit var blueParticleShooter: ParticleShooter
     private var globalStartTime: Long = 0
-
-    private lateinit var particleDirection: Geometry.Vector
-
-    private var particleTexture = 0
 
     private lateinit var skyboxProgram: SkyboxShaderProgram
     private lateinit var skybox: Skybox
@@ -94,38 +77,10 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         glEnable(GL_DEPTH_TEST)
 //        glEnable(GL_CULL_FACE)
 
-        particleProgram = ParticleShaderProgram(context)
-        particleSystem = ParticleSystem(1000);
         globalStartTime = System.nanoTime();
-
-        particleDirection = Geometry.Vector(0f, 0.5f, 0f)
 
         val angleVarianceInDegrees = 5f;
         val speedVariance = 1f;
-
-        redParticleShooter = ParticleShooter(
-            Geometry.Point(-0.8f, 0f, 0f),
-            particleDirection,
-            Color.rgb(255, 50, 5),
-            angleVarianceInDegrees,
-            speedVariance
-        )
-        greenParticleShooter = ParticleShooter(
-            Geometry.Point(0f, 0f, 0f),
-            particleDirection,
-            Color.rgb(25, 255, 25),
-            angleVarianceInDegrees,
-            speedVariance
-        )
-        blueParticleShooter = ParticleShooter(
-            Geometry.Point(0.8f, 0f, 0f),
-            particleDirection,
-            Color.rgb(5, 50, 255),
-            angleVarianceInDegrees,
-            speedVariance
-        )
-
-        particleTexture = TextureHelper.loadTexture(context, R.drawable.particle_texture)
 
         skyboxProgram = SkyboxShaderProgram( context )
         skybox = Skybox()
@@ -155,7 +110,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         drawSkybox()
         drawBase()
-//        drawParticles()
     }
 
 
@@ -165,13 +119,12 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         rotateM(viewMatrix, 0, xRotation, 0f, 1f, 0f)
         System.arraycopy(viewMatrix, 0, viewMatrixForSkybox, 0, viewMatrix.size )
 
-        val yFactor =
-
         setIdentityM(viewMatrix, 0)
         translateM(viewMatrix, 0, 0f, -3f, -15f)
         rotateM(viewMatrix, 0, xRotation, 0f, 1f, 0f)
 
-//        =(MAX(MOD(B2,360), 360-MOD(B2,360)) - 270)/90
+        // xFactor formula
+        // =(MAX(MOD(B2,360), 360-MOD(B2,360)) - 270)/90
         val xRotMod360 = xRotation - (floor( xRotation / 360f ) * 360f);
         val zRotMod360 = (xRotation - 90f) - (floor( (xRotation - 90f) / 360f ) * 360f);
 
@@ -182,21 +135,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         rotateM(viewMatrix, 0, yRotation, xFactor, 0f, zFactor )
 
-        // xr 0     x 1     z 0
-        // xr 45    x 0.5   z 0.5
-        // xr 90    x 0     z 1
-        // xr 135   x -0.5  z 0.5
-        // xr 180   x -1    z 0
-        // xr 225   x -0.5  z -0.5      also xr -135
-        // xr 270   x 0     z -1        also xr -90
-        // xr 315   x 0.5   z -0.5      also xr -45
-        // xr 360   x 1     z 0         also x = 0
-
-//        setLookAtM( viewMatrix, 0, 5f, 2f, 0f, 0f, 0f, 0f, 5f, 3f, 0f )
-
-        // We want the translation to apply to the regular view matrix, and not the skybox.
-//        translateM(viewMatrix, 0, 0f, 1.5f, 5f)
-//        rotateM(viewMatrix, 0, 5f, 0f, 1f, 0f)
     }
 
     private fun updateMvpMatrix() {
@@ -243,29 +181,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         base.bindData(baseProgram)
         base.draw()
 
-        glDisable(GL_BLEND)
-    }
-
-    private fun drawParticles() {
-        val currentTime = (System.nanoTime() - globalStartTime) / 1000000000f
-        redParticleShooter.addParticles(particleSystem, currentTime, 1)
-        greenParticleShooter.addParticles(particleSystem, currentTime, 1)
-        blueParticleShooter.addParticles(particleSystem, currentTime, 1)
-
-        setIdentityM(modelMatrix, 0);
-        updateMvpMatrix();
-
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_ONE, GL_ONE)
-
-        glDepthMask( false )
-
-        particleProgram.useProgram()
-        particleProgram.setUniforms(modelViewProjectionMatrix, currentTime, particleTexture)
-        particleSystem.bindData(particleProgram)
-        particleSystem.draw()
-
-        glDepthMask( true )
         glDisable(GL_BLEND)
     }
 
