@@ -2,10 +2,8 @@ package com.ickphum.armature
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.BitmapDrawable
 import android.opengl.GLES20.GL_BLEND
 import android.opengl.GLES20.GL_COLOR_BUFFER_BIT
-import android.opengl.GLES20.GL_CULL_FACE
 import android.opengl.GLES20.GL_DEPTH_BUFFER_BIT
 import android.opengl.GLES20.GL_DEPTH_TEST
 import android.opengl.GLES20.GL_LEQUAL
@@ -22,23 +20,22 @@ import android.opengl.GLES20.glViewport
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix.invertM
 import android.opengl.Matrix.multiplyMM
-import android.opengl.Matrix.multiplyMV
 import android.opengl.Matrix.rotateM
-import android.opengl.Matrix.scaleM
 import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
 import android.util.Log
-import com.ickphum.armature.objects.Heightmap
+import com.ickphum.armature.objects.Base
 import com.ickphum.armature.objects.ParticleShooter
 import com.ickphum.armature.objects.ParticleSystem
 import com.ickphum.armature.objects.Skybox
-import com.ickphum.armature.programs.HeightmapShaderProgram
+import com.ickphum.armature.programs.BaseShaderProgram
 import com.ickphum.armature.programs.ParticleShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.TextureHelper
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.floor
 
 
 private const val TAG = "3DRenderer"
@@ -56,7 +53,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private val invertedViewProjectionMatrix = FloatArray(16)
     private val tempMatrix = FloatArray(16)
     private val modelViewMatrix = FloatArray(16)
-    private val it_modelViewMatrix = FloatArray(16)
+    private val itModelViewMatrix = FloatArray(16)
 
     private lateinit var particleProgram: ParticleShaderProgram
     private lateinit var particleSystem: ParticleSystem
@@ -65,7 +62,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var blueParticleShooter: ParticleShooter
     private var globalStartTime: Long = 0
 
-    lateinit var particleDirection: Geometry.Vector
+    private lateinit var particleDirection: Geometry.Vector
 
     private var particleTexture = 0
 
@@ -73,8 +70,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var skybox: Skybox
     private var skyboxTexture = 0
 
-    private lateinit var heightmapProgram: HeightmapShaderProgram
-    private lateinit var heightmap: Heightmap
+    private lateinit var baseProgram: BaseShaderProgram
+    private lateinit var base: Base
 
     private var xRotation = 0f
     private var yRotation = 0f
@@ -93,12 +90,12 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     )
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+        glClearColor(0.2f, 0.0f, 0.0f, 0.0f)
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_CULL_FACE)
+//        glEnable(GL_CULL_FACE)
 
-        particleProgram = ParticleShaderProgram(context);
-        particleSystem = ParticleSystem(10000);
+        particleProgram = ParticleShaderProgram(context)
+        particleSystem = ParticleSystem(1000);
         globalStartTime = System.nanoTime();
 
         particleDirection = Geometry.Vector(0f, 0.5f, 0f)
@@ -133,12 +130,12 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         skyboxProgram = SkyboxShaderProgram( context )
         skybox = Skybox()
         skyboxTexture = TextureHelper.loadCubeMap( context,
-            intArrayOf(R.drawable.night_left, R.drawable.night_right,
-                R.drawable.night_bottom, R.drawable.night_top,
-                R.drawable.night_front, R.drawable.night_back))
+            intArrayOf(R.drawable.left, R.drawable.right,
+                R.drawable.bottom, R.drawable.top,
+                R.drawable.front, R.drawable.back))
 
-        heightmapProgram = HeightmapShaderProgram( context )
-        heightmap = Heightmap( ( context.resources.getDrawable( R.drawable.heightmap ) as BitmapDrawable ).bitmap )
+        baseProgram = BaseShaderProgram( context )
+        base = Base( 2.5f )
 
     }
 
@@ -157,23 +154,55 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT )
 
         drawSkybox()
-        drawHeightmap()
-        drawParticles()
+        drawBase()
+//        drawParticles()
     }
+
 
     private fun updateViewMatrices() {
         setIdentityM(viewMatrix, 0)
-        rotateM(viewMatrix, 0, -yRotation, 1f, 0f, 0f)
-        rotateM(viewMatrix, 0, -xRotation, 0f, 1f, 0f)
+        rotateM(viewMatrix, 0, yRotation, 1f, 0f, 0f)
+        rotateM(viewMatrix, 0, xRotation, 0f, 1f, 0f)
         System.arraycopy(viewMatrix, 0, viewMatrixForSkybox, 0, viewMatrix.size )
+
+        val yFactor =
+
+        setIdentityM(viewMatrix, 0)
+        translateM(viewMatrix, 0, 0f, -3f, -15f)
+        rotateM(viewMatrix, 0, xRotation, 0f, 1f, 0f)
+
+//        =(MAX(MOD(B2,360), 360-MOD(B2,360)) - 270)/90
+        val xRotMod360 = xRotation - (floor( xRotation / 360f ) * 360f);
+        val zRotMod360 = (xRotation - 90f) - (floor( (xRotation - 90f) / 360f ) * 360f);
+
+        val xFactor = ( xRotMod360.coerceAtLeast(360f - xRotMod360) - 270f ) / 90f
+        val zFactor = ( zRotMod360.coerceAtLeast(360f - zRotMod360) - 270f ) / 90f;
+
+//        Log.d( TAG, "xRotMod360 $xRotMod360, xFactor $xFactor   zRotMod360 $zRotMod360, zFactor $zFactor")
+
+        rotateM(viewMatrix, 0, yRotation, xFactor, 0f, zFactor )
+
+        // xr 0     x 1     z 0
+        // xr 45    x 0.5   z 0.5
+        // xr 90    x 0     z 1
+        // xr 135   x -0.5  z 0.5
+        // xr 180   x -1    z 0
+        // xr 225   x -0.5  z -0.5      also xr -135
+        // xr 270   x 0     z -1        also xr -90
+        // xr 315   x 0.5   z -0.5      also xr -45
+        // xr 360   x 1     z 0         also x = 0
+
+//        setLookAtM( viewMatrix, 0, 5f, 2f, 0f, 0f, 0f, 0f, 5f, 3f, 0f )
+
         // We want the translation to apply to the regular view matrix, and not the skybox.
-        translateM(viewMatrix, 0, 0f, -1.5f, -5f)
+//        translateM(viewMatrix, 0, 0f, 1.5f, 5f)
+//        rotateM(viewMatrix, 0, 5f, 0f, 1f, 0f)
     }
 
     private fun updateMvpMatrix() {
         multiplyMM(modelViewMatrix, 0, viewMatrix, 0, modelMatrix, 0)
         invertM(tempMatrix, 0, modelViewMatrix, 0)
-        transposeM(it_modelViewMatrix, 0, tempMatrix, 0)
+        transposeM(itModelViewMatrix, 0, tempMatrix, 0)
         multiplyMM(
             modelViewProjectionMatrix, 0,
             projectionMatrix, 0,
@@ -197,6 +226,26 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         skybox.draw()
         glDepthFunc(GL_LESS);
     }
+
+    private fun drawBase() {
+
+        val currentTime = (System.nanoTime() - globalStartTime) / 1000000000f
+//        Log.d( TAG, "t = $currentTime" )
+
+        setIdentityM(modelMatrix, 0);
+        updateMvpMatrix();
+
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_ONE, GL_ONE)
+
+        baseProgram.useProgram()
+        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime )
+        base.bindData(baseProgram)
+        base.draw()
+
+        glDisable(GL_BLEND)
+    }
+
     private fun drawParticles() {
         val currentTime = (System.nanoTime() - globalStartTime) / 1000000000f
         redParticleShooter.addParticles(particleSystem, currentTime, 1)
@@ -220,32 +269,10 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         glDisable(GL_BLEND)
     }
 
-    private fun drawHeightmap() {
-        setIdentityM(modelMatrix, 0)
-        scaleM(modelMatrix, 0, 100f, 10f, 100f)
-        updateMvpMatrix()
-
-        val vectorToLightInEyeSpace = FloatArray(4)
-        val pointPositionsInEyeSpace = FloatArray(12)
-        multiplyMV(vectorToLightInEyeSpace, 0, viewMatrix, 0, vectorToLight, 0)
-        multiplyMV(pointPositionsInEyeSpace, 0, viewMatrix, 0, pointLightPositions, 0)
-        multiplyMV(pointPositionsInEyeSpace, 4, viewMatrix, 0, pointLightPositions, 4)
-        multiplyMV(pointPositionsInEyeSpace, 8, viewMatrix, 0, pointLightPositions, 8)
-
-        heightmapProgram.useProgram()
-
-        heightmapProgram.setUniforms(modelViewMatrix, it_modelViewMatrix,
-            modelViewProjectionMatrix, vectorToLightInEyeSpace,
-            pointPositionsInEyeSpace, pointLightColors);
-
-        heightmap.bindData(heightmapProgram)
-        heightmap.draw()
-    }
-
     fun handleTouchDrag(deltaX: Float, deltaY: Float) {
-        Log.d( TAG, "Move by $deltaX $deltaY")
         xRotation += deltaX / 16f;
         yRotation += deltaY / 16f;
+//        Log.d( TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
         if (yRotation < -90)
             yRotation = -90f;
         else if (yRotation > 90)

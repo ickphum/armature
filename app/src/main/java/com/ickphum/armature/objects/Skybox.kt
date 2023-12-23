@@ -50,9 +50,7 @@ class Skybox {
                 7, 2, 3
             )
         )
-    init {
-        indexArray.position( 0 )
-    }
+        .position( 0 )
 
     fun bindData(skyboxProgram: SkyboxShaderProgram) {
         vertexArray.setVertexAttribPointer(
