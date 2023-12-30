@@ -40,6 +40,22 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
             MotionEvent.ACTION_DOWN -> {
                 previousX = x
                 previousY = y
+
+                val normalizedX: Float = x / width * 2 - 1
+                val normalizedY: Float = -(y / height * 2 - 1)
+
+                queueEvent(Runnable {
+                    renderer.handleTouchDown( normalizedX, normalizedY )
+                })
+            }
+            MotionEvent.ACTION_UP -> {
+
+                val normalizedX: Float = x / width * 2 - 1
+                val normalizedY: Float = -(y / height * 2 - 1)
+
+                queueEvent(Runnable {
+                    renderer.handleTouchUp( normalizedX, normalizedY )
+                })
             }
             MotionEvent.ACTION_MOVE -> {
                 val deltaX = previousX - x

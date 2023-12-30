@@ -1,5 +1,6 @@
 package com.ickphum.armature.util
 
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 
@@ -32,7 +33,12 @@ class Geometry {
         }
     }
 
-    class Cylinder(val center: Point, val radius: Float, val height: Float)
+    class Cylinder(val center: Point, val radius: Float, val height: Float) {
+        override fun toString(): String {
+            return "Cylinder(center=$center, radius=$radius, height=$height)"
+        }
+    }
+
     class Vector(val x: Float, val y: Float, val z: Float) {
         fun length(): Float {
             return sqrt(
@@ -63,8 +69,17 @@ class Geometry {
         fun normalize(): com.ickphum.armature.util.Geometry.Vector {
             return scale(1f / length())
         }
+
+        override fun toString(): String {
+            return "Vector(x=$x, y=$y, z=$z)"
+        }
+
     }
-    class Ray(val point: Point, val vector: Vector)
+    class Ray(val point: Point, val vector: Vector) {
+        override fun toString(): String {
+            return "Ray(point=$point, vector=$vector)"
+        }
+    }
 
     class Sphere(val center: Point, val radius: Float)
 
@@ -102,12 +117,17 @@ class Geometry {
             return distanceBetween(sphere.center, ray) < sphere.radius
         }
 
-        fun intersectionPoint(ray: Ray, plane: Plane): Point {
+        fun intersectionPoint(ray: Ray, plane: Plane): Point? {
             val rayToPlaneVector = vectorBetween(ray.point, plane.point)
-            val scaleFactor: Float = (rayToPlaneVector.dotProduct(plane.normal)
-                    / ray.vector.dotProduct(plane.normal))
-            return ray.point.translate(ray.vector.scale(scaleFactor))
+            val rayDotProduct =  ray.vector.dotProduct(plane.normal)
+            if ( abs( rayDotProduct ) > 0.00000001 ) {
+                val scaleFactor: Float = (rayToPlaneVector.dotProduct(plane.normal)
+                        / rayDotProduct)
+                return ray.point.translate(ray.vector.scale(scaleFactor))
+            }
+            return null
         }
+
         fun clamp(value: Float, min: Float, max: Float): Float {
             return max.coerceAtMost(value.coerceAtLeast(min))
         }

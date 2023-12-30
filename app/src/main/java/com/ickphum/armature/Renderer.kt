@@ -16,19 +16,26 @@ import android.opengl.GLES20.glDisable
 import android.opengl.GLES20.glEnable
 import android.opengl.GLES20.glViewport
 import android.opengl.GLSurfaceView
+import android.opengl.Matrix
 import android.opengl.Matrix.invertM
 import android.opengl.Matrix.multiplyMM
 import android.opengl.Matrix.rotateM
 import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
+import android.util.Log
 import com.ickphum.armature.objects.Base
+import com.ickphum.armature.objects.Cylinder
 import com.ickphum.armature.objects.Skybox
 import com.ickphum.armature.programs.BaseShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
+import com.ickphum.armature.util.Geometry
+import com.ickphum.armature.util.Geometry.Ray
 import com.ickphum.armature.util.TextureHelper
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.floor
+import kotlin.math.sin
+
 
 private const val TAG = "3DRenderer"
 
@@ -56,8 +63,11 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var baseProgram: BaseShaderProgram
     private lateinit var base: Base
 
+    private var cylinders: MutableList<Cylinder> = mutableListOf<Cylinder>( )
+    private lateinit var cylinder: Cylinder
+
     private var xRotation = 0f
-    private var yRotation = 0f
+    private var yRotation = 25f
 
     val vectorToLight = floatArrayOf(0.30f, 0.35f, -0.89f, 0f)
 
@@ -71,6 +81,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         0.02f, 0.15f, 0.02f,
         0.02f, 0.20f, 1.00f
     )
+
+    private var panning = false
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
         glClearColor(0.2f, 0.0f, 0.0f, 0.0f)
@@ -91,6 +103,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         baseProgram = BaseShaderProgram( context )
         base = Base( 2.5f )
+        cylinder = Cylinder(Geometry.Point(1f, 0f, -2f), 0.2f, 0.5f)
 
     }
 
@@ -109,6 +122,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT )
 
         drawSkybox()
+        drawCylinders()
         drawBase()
     }
 
@@ -120,7 +134,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         System.arraycopy(viewMatrix, 0, viewMatrixForSkybox, 0, viewMatrix.size )
 
         setIdentityM(viewMatrix, 0)
-        translateM(viewMatrix, 0, 0f, -3f, -15f)
+        translateM(viewMatrix, 0, 0f, -4f, -15f)
         rotateM(viewMatrix, 0, xRotation, 0f, 1f, 0f)
 
         // xFactor formula
@@ -146,6 +160,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             projectionMatrix, 0,
             modelViewMatrix, 0
         )
+        invertM(invertedViewProjectionMatrix, 0, modelViewProjectionMatrix, 0);
     }
 
     private fun updateMvpMatrixForSkybox() {
@@ -168,7 +183,9 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private fun drawBase() {
 
         val currentTime = (System.nanoTime() - globalStartTime) / 1000000000f
-//        Log.d( TAG, "t = $currentTime" )
+
+        // pct is in range 0-1
+        val pct = ((sin(currentTime * 3f) + 1f) / 2f);
 
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
@@ -177,23 +194,111 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         glBlendFunc(GL_ONE, GL_ONE)
 
         baseProgram.useProgram()
-        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime )
+        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0f, 0.2f + 0.2f * pct, 0.1f )
         base.bindData(baseProgram)
         base.draw()
 
         glDisable(GL_BLEND)
     }
 
-    fun handleTouchDrag(deltaX: Float, deltaY: Float) {
-        xRotation += deltaX / 16f;
-        yRotation += deltaY / 16f;
-//        Log.d( TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
-        if (yRotation < -90)
-            yRotation = -90f;
-        else if (yRotation > 90)
-            yRotation = 90f;
-        updateViewMatrices()
+    private fun drawCylinders() {
 
+        if ( cylinders.size == 0 ) return
+
+        val currentTime = (System.nanoTime() - globalStartTime) / 1000000000f
+
+        // pct is in range 0-1
+        val pct = ((sin(currentTime * 3f) + 1f) / 2f);
+
+        setIdentityM(modelMatrix, 0);
+        updateMvpMatrix();
+
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_ONE, GL_ONE)
+
+        baseProgram.useProgram()
+        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime, 1f, 0.2f, 0.1f )
+
+        cylinder.bindData(baseProgram)
+        cylinder.draw()
+
+        for ( cyl in cylinders ) {
+            cyl.bindData(baseProgram)
+            cyl.draw()
+        }
+
+        glDisable(GL_BLEND)
+    }
+
+    fun handleTouchDrag(deltaX: Float, deltaY: Float) {
+
+        if ( panning ) {
+            xRotation += deltaX / 16f;
+            yRotation += deltaY / 16f;
+//        Log.d( TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
+            if (yRotation < -90)
+                yRotation = -90f;
+            else if (yRotation > 90)
+                yRotation = 90f;
+            updateViewMatrices()
+        }
+
+    }
+    private fun divideByW(vector: FloatArray) {
+        vector[0] /= vector[3]
+        vector[1] /= vector[3]
+        vector[2] /= vector[3]
+    }
+    private fun convertNormalized2DPointToRay(
+        normalizedX: Float, normalizedY: Float
+    ): Geometry.Ray {
+        // We'll convert these normalized device coordinates into world-space
+        // coordinates. We'll pick a point on the near and far planes, and draw a
+        // line between them. To do this transform, we need to first multiply by
+        // the inverse matrix, and then we need to undo the perspective divide.
+        val nearPointNdc = floatArrayOf(normalizedX, normalizedY, -1f, 1f)
+        val farPointNdc = floatArrayOf(normalizedX, normalizedY, 1f, 1f)
+        val nearPointWorld = FloatArray(4)
+        val farPointWorld = FloatArray(4)
+        Matrix.multiplyMV(
+            nearPointWorld, 0, invertedViewProjectionMatrix, 0, nearPointNdc, 0
+        )
+        Matrix.multiplyMV(
+            farPointWorld, 0, invertedViewProjectionMatrix, 0, farPointNdc, 0
+        )
+
+        // Why are we dividing by W? We multiplied our vector by an inverse
+        // matrix, so the W value that we end up is actually the *inverse* of
+        // what the projection matrix would create. By dividing all 3 components
+        // by W, we effectively undo the hardware perspective divide.
+        divideByW(nearPointWorld)
+        divideByW(farPointWorld)
+
+        // We don't care about the W value anymore, because our points are now
+        // in world coordinates.
+        val nearPointRay = Geometry.Point(nearPointWorld[0], nearPointWorld[1], nearPointWorld[2])
+        val farPointRay = Geometry.Point(farPointWorld[0], farPointWorld[1], farPointWorld[2])
+        return Geometry.Ray(
+            nearPointRay,
+            Geometry.vectorBetween(nearPointRay, farPointRay)
+        )
+    }
+
+    fun handleTouchDown(normalizedX: Float, normalizedY: Float) {
+        val ray: Ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+        val basePoint = base.findIntersectionPoint( ray )
+
+        //  Log.d( TAG, "Touch at $normalizedX $normalizedY, ray $ray, base point $basePoint")
+        panning = basePoint == null
+        if ( basePoint != null ) {
+            // add a new point
+            val cylinder = Cylinder( basePoint, 0.3f, 0.5f )
+            cylinders.add( cylinder )
+        }
+    }
+
+    fun handleTouchUp(normalizedX: Float, normalizedY: Float) {
+        Log.d( TAG, "Touch up at $normalizedX $normalizedY")
     }
 
 }
