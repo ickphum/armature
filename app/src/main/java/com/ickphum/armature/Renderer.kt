@@ -64,7 +64,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var base: Base
 
     private var cylinders: MutableList<Cylinder> = mutableListOf<Cylinder>( )
-    private lateinit var cylinder: Cylinder
+//    private lateinit var cylinder: Cylinder
 
     private var xRotation = 0f
     private var yRotation = 25f
@@ -103,7 +103,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         baseProgram = BaseShaderProgram( context )
         base = Base( 2.5f )
-        cylinder = Cylinder(Geometry.Point(1f, 0f, -2f), 0.2f, 0.5f)
+//        cylinder = Cylinder(Geometry.Point(1f, 0f, -2f), 0.2f, 0.5f)
 
     }
 
@@ -213,21 +213,18 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
 
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_ONE, GL_ONE)
+//        glEnable(GL_BLEND)
+//        glBlendFunc(GL_ONE, GL_ONE)
 
         baseProgram.useProgram()
-        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime, 1f, 0.2f, 0.1f )
-
-        cylinder.bindData(baseProgram)
-        cylinder.draw()
+        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0.8f, 0.3f, 0.3f )
 
         for ( cyl in cylinders ) {
             cyl.bindData(baseProgram)
             cyl.draw()
         }
 
-        glDisable(GL_BLEND)
+//        glDisable(GL_BLEND)
     }
 
     fun handleTouchDrag(deltaX: Float, deltaY: Float) {
@@ -242,6 +239,11 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
                 yRotation = 90f;
             updateViewMatrices()
         }
+        else {
+            Log.d(TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
+            val cylinder = cylinders.get( cylinders.size - 1 )
+            cylinder.changeHeight( -deltaY / 100 )
+        }
 
     }
     private fun divideByW(vector: FloatArray) {
@@ -252,6 +254,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private fun convertNormalized2DPointToRay(
         normalizedX: Float, normalizedY: Float
     ): Geometry.Ray {
+
         // We'll convert these normalized device coordinates into world-space
         // coordinates. We'll pick a point on the near and far planes, and draw a
         // line between them. To do this transform, we need to first multiply by
