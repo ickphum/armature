@@ -7,6 +7,9 @@ import kotlin.math.sqrt
 class Geometry {
 
     class Point(val x: Float, val y: Float, val z: Float) {
+
+        constructor( data: FloatArray, offset: Int ) : this( data[ offset], data[ offset + 1], data[ offset + 2 ])
+
         fun translateY(distance: Float): Point {
             return Point(x, y + distance, z)
         }
@@ -54,19 +57,19 @@ class Geometry {
             )
         }
 
-        fun dotProduct(other: com.ickphum.armature.util.Geometry.Vector): Float {
+        fun dotProduct(other: Vector): Float {
             return x * other.x + y * other.y + z * other.z
         }
 
-        fun scale(f: Float): com.ickphum.armature.util.Geometry.Vector {
-            return com.ickphum.armature.util.Geometry.Vector(
+        fun scale(f: Float): Vector {
+            return Vector(
                 x * f,
                 y * f,
                 z * f
             )
         }
 
-        fun normalize(): com.ickphum.armature.util.Geometry.Vector {
+        fun normalize(): Vector {
             return scale(1f / length())
         }
 

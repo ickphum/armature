@@ -28,6 +28,7 @@ import com.ickphum.armature.objects.Base
 import com.ickphum.armature.objects.Cylinder
 import com.ickphum.armature.objects.Skybox
 import com.ickphum.armature.programs.BaseShaderProgram
+import com.ickphum.armature.programs.CylinderShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.Geometry.Ray
@@ -63,13 +64,14 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var baseProgram: BaseShaderProgram
     private lateinit var base: Base
 
+    private lateinit var cylinderProgram: CylinderShaderProgram
     private var cylinders: MutableList<Cylinder> = mutableListOf<Cylinder>( )
 //    private lateinit var cylinder: Cylinder
 
     private var xRotation = 0f
     private var yRotation = 25f
 
-    val vectorToLight = floatArrayOf(0.30f, 0.35f, -0.89f, 0f)
+    private val vectorToLight = Geometry.Vector(2f, 5f, 4f).normalize()
 
     private val pointLightPositions = floatArrayOf(
         -1f, 1f, 0f, 1f,
@@ -103,6 +105,9 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         baseProgram = BaseShaderProgram( context )
         base = Base( 2.5f )
+
+        cylinderProgram = CylinderShaderProgram( context )
+
 //        cylinder = Cylinder(Geometry.Point(1f, 0f, -2f), 0.2f, 0.5f)
 
     }
@@ -205,22 +210,17 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         if ( cylinders.size == 0 ) return
 
-        val currentTime = (System.nanoTime() - globalStartTime) / 1000000000f
-
-        // pct is in range 0-1
-        val pct = ((sin(currentTime * 3f) + 1f) / 2f);
-
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
 
 //        glEnable(GL_BLEND)
 //        glBlendFunc(GL_ONE, GL_ONE)
 
-        baseProgram.useProgram()
-        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0.8f, 0.3f, 0.3f )
+        cylinderProgram.useProgram()
+        cylinderProgram.setUniforms( modelViewProjectionMatrix, vectorToLight )
 
         for ( cyl in cylinders ) {
-            cyl.bindData(baseProgram)
+            cyl.bindData(cylinderProgram)
             cyl.draw()
         }
 
