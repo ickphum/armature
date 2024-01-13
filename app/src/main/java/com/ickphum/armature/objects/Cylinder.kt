@@ -36,43 +36,6 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
 
     private val plane = Geometry.Plane(Geometry.Point(0f, 0f, 0f), Geometry.Vector(0f, 1f, 0f))
 
-    private val triangleData = floatArrayOf(
-
-        0f, 1f, 0.0f,   0.5f, 0.5f, -0.5f,
-        1f, 0f, 0.0f,   0.5f, 0.5f, -0.5f,
-        0f, 0f, -1f,    0.5f, 0.5f, -0.5f,
-
-        0f, 1f, 0f,     -0.5f, 0.5f, -0.5f,
-        0f, 0f, -1f,    -0.5f, 0.5f, -0.5f,
-        -1f, 0f, 0f,    -0.5f, 0.5f, -0.5f,
-
-        0f, 1f, 0f,     -0.5f, 0.5f, 0.5f,
-        -1f, 0f, 0f,    -0.5f, 0.5f, 0.5f,
-        0f, 0f, 1f,     -0.5f, 0.5f, 0.5f,
-
-        0f, 1f, 0f,     0.5f, 0.5f, 0.5f,
-        0f, 0f, 1f,     0.5f, 0.5f, 0.5f,
-        1f, 0f, 0f,     0.5f, 0.5f, 0.5f,
-//
-//        0f, 1f, 0.0f,   0f, 0f, -1f,
-//        1f, 0f, 0.0f,   0f, 0f, 1f,
-//        0f, 0f, -1f,    0f, 0f, -1f,
-//
-//        0f, 1f, 0f,     -1f, 0f, 0f,
-//        0f, 0f, -1f,    -1f, 0f, 0f,
-//        -1f, 0f, 0f,    -1f, 0f, 0f,
-//
-//        0f, 1f, 0f,     1f, 0f, 0f,
-//        -1f, 0f, 0f,    1f, 0f, 0f,
-//        0f, 0f, 1f,     1f, 0f, 0f,
-//
-//        0f, 1f, 0f,     0f, 0f, 1f,
-//        0f, 0f, 1f,     0f, 0f, 1f,
-//        1f, 0f, 0f,     0f, 0f, 1f,
-
-        )
-    private var triangleArray = VertexArray( triangleData )
-
     init {
         // fill in the float data
         var offset = 0
@@ -116,7 +79,6 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
             // top strip normal; unit vector from center to vertex
             val vertexPoint = Geometry.Point( vertexData, offset - 6 )
             val centerToVertex = Geometry.vectorBetween( centerPoint, vertexPoint ).normalize()
-//            Log.d( TAG, "centerToVertex $centerPoint -> $vertexPoint = $centerToVertex")
 
             vertexData[ stripOffset++ ] = centerToVertex.x
             vertexData[ stripOffset++ ] = centerToVertex.y
@@ -133,9 +95,7 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
             vertexData[ stripOffset++ ] = centerToVertex.z
         }
 
-        Log.d( TAG, "dump")
         dumpArray( TAG, vertexData, 3)
-        Log.d( TAG, "dump2")
         // create the vertex array
         vertexArray = VertexArray( vertexData )
 
@@ -152,22 +112,11 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
             program.getNormalAttributeLocation(),
             NORMAL_COMPONENT_COUNT, STRIDE
         )
-//        triangleArray.setVertexAttribPointer(
-//            0,
-//            program.getPositionAttributeLocation(),
-//            POSITION_COMPONENT_COUNT, STRIDE
-//        )
-//        triangleArray.setVertexAttribPointer(
-//            POSITION_COMPONENT_COUNT,
-//            program.getNormalAttributeLocation(),
-//            NORMAL_COMPONENT_COUNT, STRIDE
-//        )
     }
 
     fun draw() {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, NUMBER_FAN_VERTICES)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, NUMBER_FAN_VERTICES, NUMBER_STRIP_VERTICES)
-//        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 12 )
     }
 
     fun changeHeight(delta: Float) {
@@ -177,7 +126,6 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
         // and the top of the strip. It would be more efficient to change the bottom
         // of the strip and always set the vertices with the top at 0, and then move it
         // up by the height in the shader.
-        Log.d( TAG, "changeHeight $height $delta $safeDelta")
         vertexData[ 1 ] += safeDelta
         for (i in 0..SEGMENTS) {
             vertexData[ ( i + 1 ) * TOTAL_COMPONENT_COUNT + 1 ] += safeDelta

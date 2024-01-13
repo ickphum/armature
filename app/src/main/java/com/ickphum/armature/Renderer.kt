@@ -213,9 +213,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
 
-//        glEnable(GL_BLEND)
-//        glBlendFunc(GL_ONE, GL_ONE)
-
         cylinderProgram.useProgram()
         cylinderProgram.setUniforms( modelViewProjectionMatrix, vectorToLight )
 
@@ -223,8 +220,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             cyl.bindData(cylinderProgram)
             cyl.draw()
         }
-
-//        glDisable(GL_BLEND)
     }
 
     fun handleTouchDrag(deltaX: Float, deltaY: Float) {
