@@ -21,7 +21,7 @@ class Base ( val size: Float ){
     fun bindData(program: BaseShaderProgram) {
         vertexArray.setVertexAttribPointer(
             0,
-            program.getPositionAttributeLocation(),
+            0,
             POSITION_COMPONENT_COUNT, 0
         )
     }

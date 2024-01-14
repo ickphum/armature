@@ -1,7 +1,8 @@
+#version 310 es
 uniform mat4 u_Matrix;
 //uniform float u_Time;
 
-attribute vec3 a_Position;
+layout ( location=0 ) in vec3 a_Position;
 void main()
 {
 //    float pct = ((sin(u_Time * 3.0) + 1.0) / 2.0);

@@ -17,7 +17,7 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
         private const val NORMAL_COMPONENT_COUNT = 3
         private const val TOTAL_COMPONENT_COUNT = POSITION_COMPONENT_COUNT + NORMAL_COMPONENT_COUNT
         private const val STRIDE = TOTAL_COMPONENT_COUNT * BYTES_PER_FLOAT
-        private const val SEGMENTS = 12
+        private const val SEGMENTS = 20
         private const val TAG = "Cylinder"
 
         // the fan and the strip both go around the circle and repeat the start,
@@ -33,6 +33,8 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
 
     private val vertexData = FloatArray(NUMBER_VERTICES * TOTAL_COMPONENT_COUNT )
     private var vertexArray: VertexArray
+
+    private var highlight = true
 
     private val plane = Geometry.Plane(Geometry.Point(0f, 0f, 0f), Geometry.Vector(0f, 1f, 0f))
 
@@ -104,12 +106,12 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
     fun bindData(program: CylinderShaderProgram) {
         vertexArray.setVertexAttribPointer(
             0,
-            program.getPositionAttributeLocation(),
+            0, // program.getPositionAttributeLocation(),
             POSITION_COMPONENT_COUNT, STRIDE
         )
         vertexArray.setVertexAttribPointer(
             POSITION_COMPONENT_COUNT,
-            program.getNormalAttributeLocation(),
+            1, // program.getNormalAttributeLocation(),
             NORMAL_COMPONENT_COUNT, STRIDE
         )
     }

@@ -1,7 +1,9 @@
+#version 310 es
 precision mediump float;
 uniform samplerCube u_TextureUnit;
-varying vec3 v_Position;
+in vec3 v_Position;
+out vec4 finalColor;
 void main()
 {
-    gl_FragColor = textureCube(u_TextureUnit, v_Position);
+    finalColor = texture(u_TextureUnit, v_Position);
 }

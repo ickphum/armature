@@ -18,16 +18,11 @@ class SkyboxShaderProgram ( context: Context )
 
     private var uMatrixLocation = glGetUniformLocation(program, U_MATRIX)
     private var uTextureUnitLocation = glGetUniformLocation(program, U_TEXTURE_UNIT)
-    private var aPositionLocation = glGetAttribLocation(program, A_POSITION)
 
     fun setUniforms(matrix: FloatArray?, textureId: Int) {
         glUniformMatrix4fv(uMatrixLocation, 1, false, matrix, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_CUBE_MAP, textureId)
         glUniform1i(uTextureUnitLocation, 0)
-    }
-
-    fun getPositionAttributeLocation(): Int {
-        return aPositionLocation
     }
 }

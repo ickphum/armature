@@ -1,6 +1,7 @@
+#version 310 es
 uniform mat4 u_Matrix;
-attribute vec3 a_Position;
-varying vec3 v_Position;
+layout (location=0) in vec3 a_Position;
+out vec3 v_Position;
 void main()
 {
     v_Position = a_Position;

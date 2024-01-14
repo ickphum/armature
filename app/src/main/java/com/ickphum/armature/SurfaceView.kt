@@ -16,8 +16,8 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
     private var previousY: Float = 0f
     init {
 
-        // Create an OpenGL ES 2.0 context
-        setEGLContextClientVersion(2)
+        // Create an OpenGL ES 3.0 context
+        setEGLContextClientVersion(3)
 
         renderer = Renderer( context )
 

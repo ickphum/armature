@@ -8,12 +8,14 @@ import android.opengl.GLES20.GL_DEPTH_TEST
 import android.opengl.GLES20.GL_LEQUAL
 import android.opengl.GLES20.GL_LESS
 import android.opengl.GLES20.GL_ONE
+import android.opengl.GLES20.GL_VERSION
 import android.opengl.GLES20.glBlendFunc
 import android.opengl.GLES20.glClear
 import android.opengl.GLES20.glClearColor
 import android.opengl.GLES20.glDepthFunc
 import android.opengl.GLES20.glDisable
 import android.opengl.GLES20.glEnable
+import android.opengl.GLES20.glGetString
 import android.opengl.GLES20.glViewport
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
@@ -87,9 +89,14 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private var panning = false
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
+
+        val version = glGetString(GL_VERSION)
+
         glClearColor(0.2f, 0.0f, 0.0f, 0.0f)
         glEnable(GL_DEPTH_TEST)
 //        glEnable(GL_CULL_FACE)
+
+        Log.d( TAG, "************** version $version ******************")
 
         globalStartTime = System.nanoTime();
 
@@ -239,8 +246,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             val cylinder = cylinders.get( cylinders.size - 1 )
             cylinder.changeHeight( -deltaY / 100 )
         }
-
     }
+
     private fun divideByW(vector: FloatArray) {
         vector[0] /= vector[3]
         vector[1] /= vector[3]

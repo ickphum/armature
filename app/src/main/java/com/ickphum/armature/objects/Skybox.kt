@@ -55,7 +55,7 @@ class Skybox {
     fun bindData(skyboxProgram: SkyboxShaderProgram) {
         vertexArray.setVertexAttribPointer(
             0,
-            skyboxProgram.getPositionAttributeLocation(),
+            0,
             POSITION_COMPONENT_COUNT, 0
         )
     }

@@ -1,8 +1,10 @@
+#version 310 es
 precision mediump float;
 //uniform float u_Time;
 uniform vec4 u_Color;
 //vec3 colorA = vec3(0.0,0.4,0.0);
 //vec3 colorB = vec3(0.0,0.2,0.0);
+out vec4 finalColor;
 
 void main()
 {
@@ -17,5 +19,5 @@ void main()
 //
 //    gl_FragColor = vec4( color, 1.0 );
 
-    gl_FragColor = u_Color;
+    finalColor = u_Color;
 }
