@@ -66,6 +66,9 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var baseProgram: BaseShaderProgram
     private lateinit var base: Base
 
+    // intersection of touch down with base
+    private var basePoint: Geometry.Point? = null
+
     private lateinit var cylinderProgram: CylinderShaderProgram
     private var cylinders: MutableList<Cylinder> = mutableListOf<Cylinder>( )
 //    private lateinit var cylinder: Cylinder
@@ -86,7 +89,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         0.02f, 0.20f, 1.00f
     )
 
-    private var panning = false
+    private var state = State.SELECT
+    private var preDragState = State.SELECT
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
 
@@ -116,6 +120,24 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         cylinderProgram = CylinderShaderProgram( context )
 
 //        cylinder = Cylinder(Geometry.Point(1f, 0f, -2f), 0.2f, 0.5f)
+
+        // triangle tests
+        val t1 = Geometry.Triangle( Geometry.Vector( 0f, 0f, 0f ), Geometry.Vector( 4f, 0f, 0f ), Geometry.Vector( 0f, 0f, 4f ))
+        val points = arrayOf(
+            Geometry.Point(0f, 0f, 0f),
+            Geometry.Point(-0.01f, 0f, 0f),
+            Geometry.Point(0f, 0f, -0.01f),
+            Geometry.Point(4f, 0f, 0f),
+            Geometry.Point(0f, 0f, 4f),
+            Geometry.Point(4.01f, 0f, 0f),
+            Geometry.Point(0f, 0f, 4.01f),
+            Geometry.Point(1f, 0f, 1f),
+            Geometry.Point(5f, 0f, 0f),
+        )
+        for ( p in points ) {
+            val rc = t1.pointInTriangle( p )
+            Log.d( TAG, "Check point $p $rc")
+        }
 
     }
 
@@ -197,7 +219,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         val currentTime = (System.nanoTime() - globalStartTime) / 1000000000f
 
         // pct is in range 0-1
-        val pct = ((sin(currentTime * 3f) + 1f) / 2f);
+        val pct = if (state == State.SELECT) ((sin(currentTime * 3f) + 1f) / 2f)  else 0.5f
 
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
@@ -226,25 +248,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         for ( cyl in cylinders ) {
             cyl.bindData(cylinderProgram)
             cyl.draw()
-        }
-    }
-
-    fun handleTouchDrag(deltaX: Float, deltaY: Float) {
-
-        if ( panning ) {
-            xRotation += deltaX / 16f;
-            yRotation += deltaY / 16f;
-//        Log.d( TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
-            if (yRotation < -90)
-                yRotation = -90f;
-            else if (yRotation > 90)
-                yRotation = 90f;
-            updateViewMatrices()
-        }
-        else {
-            Log.d(TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
-            val cylinder = cylinders.get( cylinders.size - 1 )
-            cylinder.changeHeight( -deltaY / 100 )
         }
     }
 
@@ -289,21 +292,80 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         )
     }
 
-    fun handleTouchDown(normalizedX: Float, normalizedY: Float) {
-        val ray: Ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
-        val basePoint = base.findIntersectionPoint( ray )
-
-        //  Log.d( TAG, "Touch at $normalizedX $normalizedY, ray $ray, base point $basePoint")
-        panning = basePoint == null
-        if ( basePoint != null ) {
-            // add a new point
-            val cylinder = Cylinder( basePoint, 0.3f, 0.5f )
-            cylinders.add( cylinder )
+    private fun clearCylinderSelections() {
+        for (cyl in cylinders) {
+            cyl.selected = false;
         }
     }
 
-    fun handleTouchUp(normalizedX: Float, normalizedY: Float) {
-        Log.d( TAG, "Touch up at $normalizedX $normalizedY")
+    fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
+        val ray: Ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+        basePoint = base.findIntersectionPoint( ray )
+
+        //  Log.d( TAG, "Touch at $normalizedX $normalizedY, ray $ray, base point $basePoint")
+        if ( basePoint != null ) {
+            return 1;
+        }
+        return 0;
+    }
+
+    fun handleShortPress(normalizedX: Float, normalizedY: Float) {
+        Log.d( TAG, "Short press at $normalizedX $normalizedY")
+        if ( basePoint == null ) {
+            clearCylinderSelections()
+            state = State.SELECT
+        }
+    }
+
+    fun handleDragStart() {
+
+        //  Log.d( TAG, "Touch at $normalizedX $normalizedY, ray $ray, base point $basePoint")
+        preDragState = state
+
+        if ( basePoint == null ) {
+            state = State.PANNING
+        }
+        else if ( state == State.SELECT ) {
+
+            // clear selection from existing cylinders
+            clearCylinderSelections()
+
+            // add a new point
+            val cylinder = Cylinder(basePoint!!, 0.3f, 0.5f)
+            cylinders.add(cylinder)
+
+            preDragState = State.SINGLE
+            state = State.MOVE
+        }
+
+    }
+
+    fun handleDragMove(deltaX: Float, deltaY: Float) {
+
+        if ( state == State.PANNING ) {
+            xRotation += deltaX / 16f;
+            yRotation += deltaY / 16f;
+//        Log.d( TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
+            if (yRotation < -90)
+                yRotation = -90f;
+            else if (yRotation > 90)
+                yRotation = 90f;
+            updateViewMatrices()
+        }
+        else if ( state == State.MOVE ){
+            Log.d(TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
+            val cylinder = cylinders.get( cylinders.size - 1 )
+            cylinder.changeHeight( -deltaY / 100 )
+        }
+    }
+
+    fun handleDragEnd(normalizedX: Float, normalizedY: Float) {
+        Log.d( TAG, "Drag end at $normalizedX $normalizedY")
+        state = preDragState
+    }
+
+    fun handleLongPress() {
+        Log.d( TAG, "Long press")
     }
 
 }

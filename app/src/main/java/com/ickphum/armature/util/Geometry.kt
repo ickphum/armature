@@ -14,13 +14,31 @@ class Geometry {
             return Point(x, y + distance, z)
         }
 
-        fun translate(vector: Vector): Point {
+        fun add(vector: Vector): Point {
             return Point(
                 x + vector.x,
                 y + vector.y,
                 z + vector.z
             )
         }
+
+        fun subtract(vector: Vector): Point {
+            return Point(
+                x - vector.x,
+                y - vector.y,
+                z - vector.z
+            )
+        }
+
+        fun subtract(point: Point): Point {
+            return Point(
+                x - point.x,
+                y - point.y,
+                z - point.z
+            )
+        }
+
+
         override fun toString(): String {
             return "Point[ $x, $y, $z ]"
         }
@@ -73,6 +91,13 @@ class Geometry {
             return scale(1f / length())
         }
 
+        fun subtract(point: Point): Vector {
+            return Vector (
+                x - point.x,
+                y - point.y,
+                z - point.z
+            )
+        }
         override fun toString(): String {
             return "Vector(x=$x, y=$y, z=$z)"
         }
@@ -88,6 +113,67 @@ class Geometry {
 
     class Plane(val point: Point, val normal: Vector)
 
+    class Triangle( val p1: Vector, val p2: Vector, val p3: Vector ) {
+        fun pointInTriangle( p: Point ) : Boolean {
+
+            val a = p1.subtract( p )
+            val b = p2.subtract( p )
+            val c = p3.subtract( p )
+
+            val u = b.crossProduct( c )
+            val v = c.crossProduct( a )
+            val w = a.crossProduct( b )
+
+            if ( u.dotProduct( v ) < 0f )
+                return false
+
+            if ( u.dotProduct( w ) < 0f )
+                return false
+            return true
+        }
+        /*
+        bool PointInTriangle(Point p, Triangle t) {
+  // Lets define some local variables, we can change these
+  // without affecting the references passed in
+  Vector3 p = point;
+  Vector3 a = t.p0;
+  Vector3 b = t.p1;
+  Vector3 c = t.p2;
+
+  // Move the triangle so that the point becomes the
+  // triangles origin
+  a -= p;
+  b -= p;
+  c -=p;
+
+  // The point should be moved too, so they are both
+  // relative, but because we don't use p in the
+  // equation anymore, we don't need it!
+  // p -= p;
+
+  // Compute the normal vectors for triangles:
+  // u = normal of PBC
+  // v = normal of PCA
+  // w = normal of PAB
+
+  Vector3 u = Cross(b, c);
+  Vector3 v = Cross(c, a);
+  Vector3 w = Cross(a, b);
+
+  // Test to see if the normals are facing
+  // the same direction, return false if not
+  if (Dot(u, v) < 0f) {
+      return false;
+  }
+  if (dot(u, w) < 0.0f) {
+      return false;
+  }
+
+  // All normals facing the same way, return true
+  return true;
+}
+         */
+    }
 
     companion object Helper {
         fun vectorBetween(from: Point, to: Point): Vector {
@@ -100,7 +186,7 @@ class Geometry {
 
         fun distanceBetween(point: Point, ray: Ray): Float {
             val p1ToPoint: Vector = vectorBetween(ray.point, point);
-            val p2ToPoint: Vector = vectorBetween(ray.point.translate(ray.vector), point)
+            val p2ToPoint: Vector = vectorBetween(ray.point.add(ray.vector), point)
 
             // The length of the cross product gives the area of an imaginary
             // parallelogram having the two vectors as sides. A parallelogram can be
@@ -126,7 +212,7 @@ class Geometry {
             if ( abs( rayDotProduct ) > 0.00000001 ) {
                 val scaleFactor: Float = (rayToPlaneVector.dotProduct(plane.normal)
                         / rayDotProduct)
-                return ray.point.translate(ray.vector.scale(scaleFactor))
+                return ray.point.add(ray.vector.scale(scaleFactor))
             }
             return null
         }

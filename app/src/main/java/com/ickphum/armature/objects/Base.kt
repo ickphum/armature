@@ -10,10 +10,10 @@ class Base ( val size: Float ){
     private val POSITION_COMPONENT_COUNT = 3
     private val vertexArray = VertexArray(
         floatArrayOf(
-            -size, -0f, -size,    // (0) rear left
-            -size, -0f, size,    // (0) front left
-            size, -0f, -size,     // (1) rear right
-            size, -0f, size,     // (1) front right
+            -size, -0f, -size,      // rear left
+            -size, -0f, size,       // front left
+            size, -0f, -size,       // rear right
+            size, -0f, size,        // front right
         )
     )
     private val plane = Geometry.Plane(Geometry.Point(0f, 0f, 0f), Geometry.Vector(0f, 1f, 0f))

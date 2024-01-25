@@ -34,7 +34,10 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
     private val vertexData = FloatArray(NUMBER_VERTICES * TOTAL_COMPONENT_COUNT )
     private var vertexArray: VertexArray
 
-    private var highlight = true
+    private val selectedColor = floatArrayOf( 0.6f, 0.6f, 0.3f )
+    private val normalColor = floatArrayOf( 0.3f, 0.3f, 0.1f )
+
+    var selected = true
 
     private val plane = Geometry.Plane(Geometry.Point(0f, 0f, 0f), Geometry.Vector(0f, 1f, 0f))
 
@@ -97,7 +100,7 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
             vertexData[ stripOffset++ ] = centerToVertex.z
         }
 
-        dumpArray( TAG, vertexData, 3)
+//        dumpArray( TAG, vertexData, 3)
         // create the vertex array
         vertexArray = VertexArray( vertexData )
 
@@ -114,6 +117,9 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
             1, // program.getNormalAttributeLocation(),
             NORMAL_COMPONENT_COUNT, STRIDE
         )
+
+        program.setColorUniform( if ( selected ) selectedColor else normalColor )
+
     }
 
     fun draw() {

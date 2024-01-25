@@ -12,10 +12,15 @@ class CylinderShaderProgram (context: Context )
 {
     private val uMatrixLocation = glGetUniformLocation(program, U_MATRIX)
     private val uVectorToLightLocation = glGetUniformLocation(program, U_VECTOR_TO_LIGHT)
+    private val uColorLocation = glGetUniformLocation(program, U_COLOR)
 
     fun setUniforms(matrix: FloatArray, vectorToLight: Geometry.Vector ) {
         glUniformMatrix4fv(uMatrixLocation, 1, false, matrix, 0)
-        glUniform3f(uVectorToLightLocation, vectorToLight.x, vectorToLight.y, vectorToLight.z);
+        glUniform3f(uVectorToLightLocation, vectorToLight.x, vectorToLight.y, vectorToLight.z)
+    }
+
+    fun setColorUniform( rgb: FloatArray) {
+        glUniform3f(uColorLocation, rgb[0], rgb[1], rgb[2] );
     }
 
 }
