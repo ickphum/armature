@@ -66,12 +66,18 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var baseProgram: BaseShaderProgram
     private lateinit var base: Base
 
+    enum class PreviousTouch {
+        NOTHING, BASE, ITEM, NODE
+    }
+    private var previousTouch = PreviousTouch.NOTHING
+
     // intersection of touch down with base
     private var basePoint: Geometry.Point? = null
+    data class TouchedCylinder( val cyl : Cylinder, val point: Geometry.Point)
+    private val touchedCylinders = mutableListOf<TouchedCylinder>( )
 
     private lateinit var cylinderProgram: CylinderShaderProgram
-    private var cylinders: MutableList<Cylinder> = mutableListOf<Cylinder>( )
-//    private lateinit var cylinder: Cylinder
+    private var cylinders = mutableListOf<Cylinder>( )
 
     private var xRotation = 0f
     private var yRotation = 25f
@@ -301,19 +307,49 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     }
 
     fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
-        val ray: Ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
-        basePoint = base.findIntersectionPoint( ray )
+        val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
 
-        //  Log.d( TAG, "Touch at $normalizedX $normalizedY, ray $ray, base point $basePoint")
-        if ( basePoint != null ) {
-            return 1;
+        touchedCylinders.clear()
+        for (cyl in cylinders) {
+            val cylinderHit = cyl.findIntersectionPoint( ray )
+            if ( cylinderHit != null )
+                touchedCylinders.add( TouchedCylinder( cyl, cylinderHit))
         }
-        return 0;
+        if ( touchedCylinders.size > 0 ) {
+            basePoint = null
+            previousTouch = PreviousTouch.ITEM
+        }
+        else {
+            basePoint = base.findIntersectionPoint(ray)
+            previousTouch = if (basePoint != null) PreviousTouch.BASE else PreviousTouch.NOTHING
+        }
+        return previousTouch.ordinal
     }
 
     fun handleShortPress(normalizedX: Float, normalizedY: Float) {
         Log.d( TAG, "Short press at $normalizedX $normalizedY")
-        if ( basePoint == null ) {
+
+        if ( previousTouch == PreviousTouch.ITEM ) {
+            if ( state == State.SINGLE ) {
+                val selectedCyl = cylinders.find { cylinder -> cylinder.selected  }
+                if ( selectedCyl == touchedCylinders[ 0 ].cyl ) {
+                    Log.d( TAG, "Touch on selected cylinder, cycle plane")
+                }
+                else {
+                    Log.d( TAG, "Touch on new cylinder; ignore")
+                }
+            }
+            else if ( state == State.GROUP ) {
+                for ( tc in touchedCylinders )
+                    tc.cyl.selected = true
+            }
+            else if ( state == State.SELECT ) {
+                for ( tc in touchedCylinders )
+                    tc.cyl.selected = true
+                state = if ( touchedCylinders.size > 1 ) State.GROUP else State.SINGLE
+            }
+        }
+        else if ( previousTouch == PreviousTouch.NOTHING ) {
             clearCylinderSelections()
             state = State.SELECT
         }

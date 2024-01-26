@@ -35,10 +35,16 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
     private val vertexData = FloatArray(NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
     private lateinit var vertexArray: VertexArray
 
-    private val selectedColor = floatArrayOf(0.8f, 0.2f, 0.3f)
+    private val selectedColor = floatArrayOf(0.3f, 0.7f, 0.3f)
     private val normalColor = floatArrayOf(0.5f, 0.1f, 0.1f)
 
-    // these triangles are used
+    // these planes and triangles are used for touch detection
+    private lateinit var xyPlane: Geometry.Plane
+    private lateinit var zyPlane: Geometry.Plane
+    private lateinit var xyTriangleTop: Geometry.Triangle
+    private lateinit var xyTriangleBottom: Geometry.Triangle
+    private lateinit var zyTriangleTop: Geometry.Triangle
+    private lateinit var zyTriangleBottom: Geometry.Triangle
 
     var selected = true
 
@@ -86,10 +92,32 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
 
         }
 
-//        dumpArray( TAG, vertexData, 3)
         // create the vertex array
         vertexArray = VertexArray(vertexData)
 
+        // touch detection
+        xyPlane = Geometry.Plane( center, Geometry.Vector( 0f, 0f, 1f ))
+        zyPlane = Geometry.Plane( center, Geometry.Vector( 1f, 0f, 0f ))
+        xyTriangleTop = Geometry.Triangle(
+            Geometry.Vector( center.x - radius, center.y + height, center.z ),
+            Geometry.Vector( center.x - radius, center.y, center.z ),
+            Geometry.Vector( center.x + radius, center.y + height, center.z ),
+        )
+        xyTriangleBottom = Geometry.Triangle(
+            Geometry.Vector( center.x - radius, center.y, center.z ),
+            Geometry.Vector( center.x + radius, center.y, center.z ),
+            Geometry.Vector( center.x + radius, center.y + height, center.z ),
+        )
+        zyTriangleTop = Geometry.Triangle(
+            Geometry.Vector( center.x, center.y + height, center.z - radius),
+            Geometry.Vector( center.x, center.y, center.z - radius),
+            Geometry.Vector( center.x, center.y + height, center.z + radius),
+        )
+        zyTriangleBottom = Geometry.Triangle(
+            Geometry.Vector( center.x, center.y, center.z - radius),
+            Geometry.Vector( center.x, center.y, center.z + radius),
+            Geometry.Vector( center.x, center.y + height, center.z + radius),
+        )
     }
 
     private fun generateCirclePoint(
@@ -243,6 +271,22 @@ class Cylinder (private val center: Geometry.Point, private val radius: Float, p
         height += safeDelta
         generateVertices()
         vertexArray.updateBuffer(vertexData, 0, NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
+    }
+
+    fun findIntersectionPoint( ray: Geometry.Ray): Geometry.Point? {
+        var touchedPoint: Geometry.Point? = Geometry.intersectionPoint(ray, xyPlane)
+        if ( touchedPoint != null )
+        {
+            if ( xyTriangleTop.pointInTriangle( touchedPoint ) || xyTriangleBottom.pointInTriangle( touchedPoint ))
+                return touchedPoint
+        }
+        touchedPoint = Geometry.intersectionPoint(ray, zyPlane)
+        if ( touchedPoint != null )
+        {
+            if ( zyTriangleTop.pointInTriangle( touchedPoint ) || zyTriangleBottom.pointInTriangle( touchedPoint ))
+                return touchedPoint
+        }
+        return null
     }
 }
 
