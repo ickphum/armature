@@ -10,7 +10,7 @@ import com.ickphum.armature.Constants.BYTES_PER_FLOAT
 import com.ickphum.armature.programs.CylinderShaderProgram
 
 
-class Cylinder (private val center: Geometry.Point, private val radius: Float, private var height: Float ) {
+class Cylinder (val center: Geometry.Point, private val radius: Float, private var height: Float ) {
     companion object {
         private const val POSITION_COMPONENT_COUNT = 3
         private const val NORMAL_COMPONENT_COUNT = 3

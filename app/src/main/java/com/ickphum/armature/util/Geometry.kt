@@ -38,6 +38,9 @@ class Geometry {
             )
         }
 
+        fun asArray() : FloatArray {
+            return floatArrayOf( x, y, z )
+        }
 
         override fun toString(): String {
             return "Point[ $x, $y, $z ]"

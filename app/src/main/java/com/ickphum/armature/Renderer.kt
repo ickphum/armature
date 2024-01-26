@@ -21,6 +21,7 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.opengl.Matrix.invertM
 import android.opengl.Matrix.multiplyMM
+import android.opengl.Matrix.multiplyMV
 import android.opengl.Matrix.rotateM
 import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
@@ -33,8 +34,8 @@ import com.ickphum.armature.programs.BaseShaderProgram
 import com.ickphum.armature.programs.CylinderShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
-import com.ickphum.armature.util.Geometry.Ray
 import com.ickphum.armature.util.TextureHelper
+import kotlinx.coroutines.selects.select
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.floor
 import kotlin.math.sin
@@ -73,8 +74,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
     // intersection of touch down with base
     private var basePoint: Geometry.Point? = null
-    data class TouchedCylinder( val cyl : Cylinder, val point: Geometry.Point)
-    private val touchedCylinders = mutableListOf<TouchedCylinder>( )
+    private var touchedCylinder: Cylinder? = null
 
     private lateinit var cylinderProgram: CylinderShaderProgram
     private var cylinders = mutableListOf<Cylinder>( )
@@ -309,13 +309,24 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
         val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
 
-        touchedCylinders.clear()
+        var minZ : Float? = null
+        touchedCylinder = null
         for (cyl in cylinders) {
+            var hitVec4 = FloatArray( 4 )
+            var resultVec4 = FloatArray( 4 )
             val cylinderHit = cyl.findIntersectionPoint( ray )
-            if ( cylinderHit != null )
-                touchedCylinders.add( TouchedCylinder( cyl, cylinderHit))
+            if ( cylinderHit != null ) {
+                hitVec4 = floatArrayOf( *cylinderHit.asArray(), 1f )
+                multiplyMV( resultVec4, 0, modelViewMatrix, 0, hitVec4, 0 )
+//                Log.d( TAG, "Cylinder ${cyl.center.x} hit $cylinderHit -> ${resultVec4[0]},${resultVec4[1]},${resultVec4[2]},${resultVec4[3]}")
+                if ( minZ == null || resultVec4[2] < minZ ) {
+                    // new min Z ie closest hit
+                    minZ = resultVec4[2];
+                    touchedCylinder = cyl
+                }
+            }
         }
-        if ( touchedCylinders.size > 0 ) {
+        if ( touchedCylinder != null ) {
             basePoint = null
             previousTouch = PreviousTouch.ITEM
         }
@@ -332,21 +343,24 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.SINGLE ) {
                 val selectedCyl = cylinders.find { cylinder -> cylinder.selected  }
-                if ( selectedCyl == touchedCylinders[ 0 ].cyl ) {
+                if ( selectedCyl == touchedCylinder ) {
                     Log.d( TAG, "Touch on selected cylinder, cycle plane")
                 }
                 else {
-                    Log.d( TAG, "Touch on new cylinder; ignore")
+                    Log.d( TAG, "Touch on new cylinder; ignore or switch?")
+                    selectedCyl!!.selected = false
+                    touchedCylinder!!.selected = true
                 }
             }
             else if ( state == State.GROUP ) {
-                for ( tc in touchedCylinders )
-                    tc.cyl.selected = true
+                touchedCylinder!!.selected = !touchedCylinder!!.selected
+                val count = cylinders.filter { cyl -> cyl.selected }.size
+                if ( count == 0 )
+                    state = State.SELECT
             }
             else if ( state == State.SELECT ) {
-                for ( tc in touchedCylinders )
-                    tc.cyl.selected = true
-                state = if ( touchedCylinders.size > 1 ) State.GROUP else State.SINGLE
+                touchedCylinder!!.selected = true
+                state = State.SINGLE
             }
         }
         else if ( previousTouch == PreviousTouch.NOTHING ) {
@@ -404,6 +418,13 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
     fun handleLongPress() {
         Log.d( TAG, "Long press")
+        if ( previousTouch == PreviousTouch.ITEM ) {
+            if ( state == State.SINGLE || state == State.GROUP || state == State.SELECT ) {
+                touchedCylinder!!.selected = true
+                state = State.GROUP
+            }
+        }
+
     }
 
 }
