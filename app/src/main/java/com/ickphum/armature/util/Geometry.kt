@@ -61,6 +61,9 @@ class Geometry {
     }
 
     class Vector(val x: Float, val y: Float, val z: Float) {
+
+        constructor( data: FloatArray, offset: Int ) : this( data[ offset], data[ offset + 1], data[ offset + 2 ])
+
         fun length(): Float {
             return sqrt(
                 x * x + y * y + z * z
@@ -98,6 +101,15 @@ class Geometry {
                 z - point.z
             )
         }
+
+        fun subtract(vector: Vector): Vector {
+            return Vector (
+                x - vector.x,
+                y - vector.y,
+                z - vector.z
+            )
+        }
+
         override fun toString(): String {
             return "Vector(x=$x, y=$y, z=$z)"
         }
@@ -114,7 +126,16 @@ class Geometry {
     class Plane(val point: Point, val normal: Vector)
 
     class Triangle( val p1: Vector, val p2: Vector, val p3: Vector ) {
+
+        fun normal() : Vector {
+            val p1MinusP2 = p1.subtract( p2 )
+            val p3MinusP2 = p3.subtract( p2 )
+            return p1MinusP2.crossProduct( p3MinusP2 )
+        }
+
         fun pointInTriangle( p: Point ) : Boolean {
+
+            // https://gdbooks.gitbooks.io/3dcollisions/content/Chapter4/point_in_triangle.html
 
             val a = p1.subtract( p )
             val b = p2.subtract( p )
@@ -127,52 +148,36 @@ class Geometry {
             if ( u.dotProduct( v ) < 0f )
                 return false
 
-            if ( u.dotProduct( w ) < 0f )
-                return false
-            return true
+            return u.dotProduct( w ) >= 0f
         }
-        /*
-        bool PointInTriangle(Point p, Triangle t) {
-  // Lets define some local variables, we can change these
-  // without affecting the references passed in
-  Vector3 p = point;
-  Vector3 a = t.p0;
-  Vector3 b = t.p1;
-  Vector3 c = t.p2;
 
-  // Move the triangle so that the point becomes the
-  // triangles origin
-  a -= p;
-  b -= p;
-  c -=p;
+        // write vertex and normal data for this triangle to the supplied array+offset
+        fun writeToArray(data: FloatArray, offset: Int) {
+            // we're assuming flat shading, so all vertices have the same normal
+            val n = normal()
 
-  // The point should be moved too, so they are both
-  // relative, but because we don't use p in the
-  // equation anymore, we don't need it!
-  // p -= p;
+            data[ offset ] = p1.x
+            data[ offset + 1] = p1.y
+            data[ offset + 2] = p1.z
+            data[ offset + 3] = n.x
+            data[ offset + 4] = n.y
+            data[ offset + 5] = n.z
 
-  // Compute the normal vectors for triangles:
-  // u = normal of PBC
-  // v = normal of PCA
-  // w = normal of PAB
+            data[ offset + 6] = p2.x
+            data[ offset + 7] = p2.y
+            data[ offset + 8] = p2.z
+            data[ offset + 9] = n.x
+            data[ offset + 10] = n.y
+            data[ offset + 11] = n.z
 
-  Vector3 u = Cross(b, c);
-  Vector3 v = Cross(c, a);
-  Vector3 w = Cross(a, b);
+            data[ offset + 12] = p3.x
+            data[ offset + 13] = p3.y
+            data[ offset + 14] = p3.z
+            data[ offset + 15] = n.x
+            data[ offset + 16] = n.y
+            data[ offset + 17] = n.z
+        }
 
-  // Test to see if the normals are facing
-  // the same direction, return false if not
-  if (Dot(u, v) < 0f) {
-      return false;
-  }
-  if (dot(u, w) < 0.0f) {
-      return false;
-  }
-
-  // All normals facing the same way, return true
-  return true;
-}
-         */
     }
 
     companion object Helper {

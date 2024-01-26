@@ -123,6 +123,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         // triangle tests
         val t1 = Geometry.Triangle( Geometry.Vector( 0f, 0f, 0f ), Geometry.Vector( 4f, 0f, 0f ), Geometry.Vector( 0f, 0f, 4f ))
+        Log.d( TAG, "Normal to flat triangle ${t1.normal()}")
+
         val points = arrayOf(
             Geometry.Point(0f, 0f, 0f),
             Geometry.Point(-0.01f, 0f, 0f),
