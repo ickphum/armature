@@ -1,12 +1,12 @@
 package com.ickphum.armature.objects
 
 import android.opengl.GLES20
-import android.util.Log
 import com.ickphum.armature.data.VertexArray
 import com.ickphum.armature.util.Geometry
 import kotlin.math.cos
 import kotlin.math.sin
 import com.ickphum.armature.Constants.BYTES_PER_FLOAT
+import com.ickphum.armature.State
 import com.ickphum.armature.programs.CylinderShaderProgram
 
 
@@ -35,7 +35,8 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, private v
     private val vertexData = FloatArray(NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
     private lateinit var vertexArray: VertexArray
 
-    private val selectedColor = floatArrayOf(0.3f, 0.7f, 0.3f)
+    private val singleColor = floatArrayOf(0.3f, 0.7f, 0.3f)
+    private val groupColor = floatArrayOf(0.97f, 0.53f, 0.08f)
     private val normalColor = floatArrayOf(0.5f, 0.1f, 0.1f)
 
     // these planes and triangles are used for touch detection
@@ -241,7 +242,7 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, private v
         bottomTriangle.writeToArray(vertexData, sideOffset)
     }
 
-    fun bindData(program: CylinderShaderProgram) {
+    fun bindData(program: CylinderShaderProgram, state : State) {
         vertexArray.setVertexAttribPointer(
             0,
             0, // program.getPositionAttributeLocation(),
@@ -253,7 +254,12 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, private v
             NORMAL_COMPONENT_COUNT, STRIDE
         )
 
-        program.setColorUniform(if (selected) selectedColor else normalColor)
+        program.setColorUniform(if (selected)
+            if ( state == State.GROUP )
+                groupColor
+            else
+                singleColor
+        else normalColor)
 
     }
 

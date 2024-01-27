@@ -35,7 +35,6 @@ import com.ickphum.armature.programs.CylinderShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.TextureHelper
-import kotlinx.coroutines.selects.select
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.floor
 import kotlin.math.sin
@@ -254,7 +253,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         cylinderProgram.setUniforms( modelViewProjectionMatrix, vectorToLight )
 
         for ( cyl in cylinders ) {
-            cyl.bindData(cylinderProgram)
+            cyl.bindData(cylinderProgram, state)
             cyl.draw()
         }
     }
@@ -309,19 +308,23 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
         val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
 
-        var minZ : Float? = null
+        var maxZ : Float? = null
         touchedCylinder = null
         for (cyl in cylinders) {
             var hitVec4 = FloatArray( 4 )
             var resultVec4 = FloatArray( 4 )
             val cylinderHit = cyl.findIntersectionPoint( ray )
             if ( cylinderHit != null ) {
+
+                // ok, basically I saw a post that said "to find the closest vertex, just apply the modelView transform and
+                // then look at the Z values, highest is closest." Seems to work.
                 hitVec4 = floatArrayOf( *cylinderHit.asArray(), 1f )
                 multiplyMV( resultVec4, 0, modelViewMatrix, 0, hitVec4, 0 )
-//                Log.d( TAG, "Cylinder ${cyl.center.x} hit $cylinderHit -> ${resultVec4[0]},${resultVec4[1]},${resultVec4[2]},${resultVec4[3]}")
-                if ( minZ == null || resultVec4[2] < minZ ) {
+                Log.d( TAG, "Cylinder ${cyl.center.x} hit $cylinderHit -> ${resultVec4[0]},${resultVec4[1]},${resultVec4[2]},${resultVec4[3]}")
+                if ( maxZ == null || resultVec4[2] > maxZ ) {
                     // new min Z ie closest hit
-                    minZ = resultVec4[2];
+                    Log.d( TAG, "new min")
+                    maxZ = resultVec4[2];
                     touchedCylinder = cyl
                 }
             }
