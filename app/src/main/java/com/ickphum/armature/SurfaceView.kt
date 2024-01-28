@@ -117,7 +117,7 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
                     val deltaX = previousX - x
                     val deltaY = previousY - y
                     queueEvent(Runnable {
-                        renderer.handleDragMove(-deltaX, -deltaY)
+                        renderer.handleDragMove(-deltaX, -deltaY, normalizedX, normalizedY)
                     })
                     previousX = x
                     previousY = y

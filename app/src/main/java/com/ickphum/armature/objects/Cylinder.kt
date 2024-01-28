@@ -6,14 +6,14 @@ import com.ickphum.armature.util.Geometry
 import kotlin.math.cos
 import kotlin.math.sin
 import com.ickphum.armature.Constants.BYTES_PER_FLOAT
+import com.ickphum.armature.Constants.NORMAL_COMPONENT_COUNT
+import com.ickphum.armature.Constants.POSITION_COMPONENT_COUNT
 import com.ickphum.armature.State
 import com.ickphum.armature.programs.CylinderShaderProgram
 
 
 class Cylinder (val center: Geometry.Point, private val radius: Float, private var height: Float ) {
     companion object {
-        private const val POSITION_COMPONENT_COUNT = 3
-        private const val NORMAL_COMPONENT_COUNT = 3
         private const val TOTAL_COMPONENT_COUNT = POSITION_COMPONENT_COUNT + NORMAL_COMPONENT_COUNT
         private const val STRIDE = TOTAL_COMPONENT_COUNT * BYTES_PER_FLOAT
         private const val SEGMENTS = 12
@@ -271,10 +271,8 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, private v
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, NUMBER_FAN_VERTICES, NUMBER_SIDE_VERTICES)
     }
 
-    fun changeHeight(delta: Float) {
-        val safeDelta = if (height + delta <= 0f) 0.01f - height else delta
-
-        height += safeDelta
+    fun changeHeight(newHeight: Float) {
+        height = if ( newHeight <= 0f) 0.01f else newHeight
         generateVertices()
         vertexArray.updateBuffer(vertexData, 0, NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
     }

@@ -27,10 +27,11 @@ import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
 import android.util.Log
-import com.ickphum.armature.objects.Base
+import com.ickphum.armature.objects.Axis
+import com.ickphum.armature.objects.Mesh
 import com.ickphum.armature.objects.Cylinder
 import com.ickphum.armature.objects.Skybox
-import com.ickphum.armature.programs.BaseShaderProgram
+import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.programs.CylinderShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
@@ -63,8 +64,9 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var skybox: Skybox
     private var skyboxTexture = 0
 
-    private lateinit var baseProgram: BaseShaderProgram
-    private lateinit var base: Base
+    private lateinit var meshProgram: MeshShaderProgram
+    private lateinit var base: Mesh
+    private var mesh: Mesh? = null
 
     enum class PreviousTouch {
         NOTHING, BASE, ITEM, NODE
@@ -119,8 +121,10 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
                 R.drawable.bottom, R.drawable.top,
                 R.drawable.front, R.drawable.back))
 
-        baseProgram = BaseShaderProgram( context )
-        base = Base( 2.5f )
+        meshProgram = MeshShaderProgram( context )
+        base = Mesh( 2.5f, Axis.Y, 0f, raised = false)
+
+        mesh = Mesh( 2.5f, Axis.Z, 0.5f)
 
         cylinderProgram = CylinderShaderProgram( context )
 
@@ -234,10 +238,19 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE)
 
-        baseProgram.useProgram()
-        baseProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0f, 0.2f + 0.2f * pct, 0.1f )
-        base.bindData(baseProgram)
+        meshProgram.useProgram()
+
+        meshProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0f, 0.2f + 0.2f * pct, 0.1f )
+        base.bindData(meshProgram)
         base.draw()
+
+        if ( mesh != null ) {
+
+            // while a mesh is displayed, we can't be in SELECT so pct is not changing
+            meshProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0.3f, 0.2f, 0.1f )
+            mesh!!.bindData(meshProgram)
+            mesh!!.draw()
+        }
 
         glDisable(GL_BLEND)
     }
@@ -391,16 +404,17 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
             preDragState = State.SINGLE
             state = State.MOVE
+            mesh = Mesh( 2.5f, Axis.Z, basePoint!!.z)
+
         }
 
     }
 
-    fun handleDragMove(deltaX: Float, deltaY: Float) {
+    fun handleDragMove(deltaX: Float, deltaY: Float, normalizedX: Float, normalizedY: Float) {
 
         if ( state == State.PANNING ) {
             xRotation += deltaX / 16f;
             yRotation += deltaY / 16f;
-//        Log.d( TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
             if (yRotation < -90)
                 yRotation = -90f;
             else if (yRotation > 90)
@@ -408,15 +422,21 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             updateViewMatrices()
         }
         else if ( state == State.MOVE ){
-            Log.d(TAG, "Move by $deltaX $deltaY, xRotation = $xRotation, yRotation = $yRotation")
             val cylinder = cylinders.get( cylinders.size - 1 )
-            cylinder.changeHeight( -deltaY / 100 )
+
+            // find intersection of current position with current mesh
+            val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+            val meshPoint = mesh!!.findIntersectionPoint(ray)
+            if ( meshPoint != null )
+                cylinder.changeHeight( meshPoint.y )
+
         }
     }
 
     fun handleDragEnd(normalizedX: Float, normalizedY: Float) {
         Log.d( TAG, "Drag end at $normalizedX $normalizedY")
         state = preDragState
+        mesh = null
     }
 
     fun handleLongPress() {

@@ -7,8 +7,8 @@ import android.opengl.GLES20.glUniform4f
 import android.opengl.GLES20.glUniformMatrix4fv
 import com.ickphum.armature.R
 
-class BaseShaderProgram ( context: Context )
-    : ShaderProgram( context, R.raw.base_vertex, R.raw.base_fragment )
+class MeshShaderProgram ( context: Context )
+    : ShaderProgram( context, R.raw.mesh_vertex, R.raw.mesh_fragment )
 {
     private val uMatrixLocation = glGetUniformLocation(program, U_MATRIX)
     private val uTimeLocation = glGetUniformLocation(program, U_TIME)
