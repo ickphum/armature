@@ -12,7 +12,7 @@ import com.ickphum.armature.State
 import com.ickphum.armature.programs.CylinderShaderProgram
 
 
-class Cylinder (val center: Geometry.Point, private val radius: Float, private var height: Float ) {
+class Cylinder (val center: Geometry.Point, private val radius: Float, var height: Float ) {
     companion object {
         private const val TOTAL_COMPONENT_COUNT = POSITION_COMPONENT_COUNT + NORMAL_COMPONENT_COUNT
         private const val STRIDE = TOTAL_COMPONENT_COUNT * BYTES_PER_FLOAT
@@ -242,7 +242,7 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, private v
         bottomTriangle.writeToArray(vertexData, sideOffset)
     }
 
-    fun bindData(program: CylinderShaderProgram, state : State) {
+    fun bindData(program: CylinderShaderProgram, state : State, preDragState: State) {
         vertexArray.setVertexAttribPointer(
             0,
             0, // program.getPositionAttributeLocation(),
@@ -255,7 +255,7 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, private v
         )
 
         program.setColorUniform(if (selected)
-            if ( state == State.GROUP )
+            if ( state == State.GROUP || ( state == State.PANNING && preDragState == State.GROUP ))
                 groupColor
             else
                 singleColor

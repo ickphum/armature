@@ -7,7 +7,7 @@ import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.util.Geometry
 
 
-class Mesh (val size: Float, axis: Axis, position: Float, raised: Boolean = true ){
+class Mesh (val size: Float, axis: Axis, position: Float ){
     companion object {
         private const val TAG = "Mesh"
         private const val MESH_CORNERS = 4
@@ -31,7 +31,7 @@ class Mesh (val size: Float, axis: Axis, position: Float, raised: Boolean = true
             vertexData[ p * POSITION_COMPONENT_COUNT + axis.axis() ] = position
 
             // raised axes (x and z) shift up to start at 0
-            if ( raised )
+            if ( axis != Axis.Y )
                 vertexData[ p * POSITION_COMPONENT_COUNT + 1 ] += size
         }
         vertexArray = VertexArray( vertexData )

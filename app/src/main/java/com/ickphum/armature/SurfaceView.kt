@@ -69,7 +69,7 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
 
                 queueEvent(Runnable {
                     val rc = renderer.handleTouchDown( normalizedX, normalizedY )
-                    Log.d( TAG, "touch down rc $rc")
+//                    Log.d( TAG, "touch down rc $rc")
 
                     // don't start the long press timer if we didn't tap on an item or node
                     if ( rc > 0 ) {

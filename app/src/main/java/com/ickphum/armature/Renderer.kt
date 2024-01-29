@@ -42,6 +42,8 @@ import kotlin.math.sin
 
 
 private const val TAG = "3DRenderer"
+private const val DEFAULT_ITEM_RADIUS = 0.3f
+private const val BASE_SIZE = 5f
 
 class Renderer(context: Context) : GLSurfaceView.Renderer {
 
@@ -67,6 +69,12 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var meshProgram: MeshShaderProgram
     private lateinit var base: Mesh
     private var mesh: Mesh? = null
+
+    // this will hold the axis for the dragging plane for the next item edit;
+    // it will always be reset by the creation of the first item so there's no point
+    // setting it now.
+    // It's also used to draw the item handles.
+    private var nextPlane: Axis? = null
 
     enum class PreviousTouch {
         NOTHING, BASE, ITEM, NODE
@@ -122,13 +130,11 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
                 R.drawable.front, R.drawable.back))
 
         meshProgram = MeshShaderProgram( context )
-        base = Mesh( 2.5f, Axis.Y, 0f, raised = false)
+        base = Mesh( BASE_SIZE / 2f, Axis.Y, 0f )
 
-        mesh = Mesh( 2.5f, Axis.Z, 0.5f)
+//        mesh = Mesh( 2.5f, Axis.Z, 0.5f)
 
         cylinderProgram = CylinderShaderProgram( context )
-
-//        cylinder = Cylinder(Geometry.Point(1f, 0f, -2f), 0.2f, 0.5f)
 
         // triangle tests
         val t1 = Geometry.Triangle( Geometry.Vector( 0f, 0f, 0f ), Geometry.Vector( 4f, 0f, 0f ), Geometry.Vector( 0f, 0f, 4f ))
@@ -266,7 +272,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         cylinderProgram.setUniforms( modelViewProjectionMatrix, vectorToLight )
 
         for ( cyl in cylinders ) {
-            cyl.bindData(cylinderProgram, state)
+            cyl.bindData(cylinderProgram, state, preDragState)
             cyl.draw()
         }
     }
@@ -333,10 +339,10 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
                 // then look at the Z values, highest is closest." Seems to work.
                 hitVec4 = floatArrayOf( *cylinderHit.asArray(), 1f )
                 multiplyMV( resultVec4, 0, modelViewMatrix, 0, hitVec4, 0 )
-                Log.d( TAG, "Cylinder ${cyl.center.x} hit $cylinderHit -> ${resultVec4[0]},${resultVec4[1]},${resultVec4[2]},${resultVec4[3]}")
+//                Log.d( TAG, "Cylinder ${cyl.center.x} hit $cylinderHit -> ${resultVec4[0]},${resultVec4[1]},${resultVec4[2]},${resultVec4[3]}")
                 if ( maxZ == null || resultVec4[2] > maxZ ) {
                     // new min Z ie closest hit
-                    Log.d( TAG, "new min")
+//                    Log.d( TAG, "new min")
                     maxZ = resultVec4[2];
                     touchedCylinder = cyl
                 }
@@ -348,31 +354,36 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         }
         else {
             basePoint = base.findIntersectionPoint(ray)
+
+            // @todo check for proximity to existing items
             previousTouch = if (basePoint != null) PreviousTouch.BASE else PreviousTouch.NOTHING
         }
         return previousTouch.ordinal
     }
 
     fun handleShortPress(normalizedX: Float, normalizedY: Float) {
-        Log.d( TAG, "Short press at $normalizedX $normalizedY")
+//        Log.d( TAG, "Short press at $normalizedX $normalizedY")
 
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.SINGLE ) {
                 val selectedCyl = cylinders.find { cylinder -> cylinder.selected  }
                 if ( selectedCyl == touchedCylinder ) {
-                    Log.d( TAG, "Touch on selected cylinder, cycle plane")
+                    nextPlane = nextPlane!!.nextAxis()
+                    Log.d( TAG, "Touch on selected cylinder, cycle plane to $nextPlane")
                 }
                 else {
-                    Log.d( TAG, "Touch on new cylinder; ignore or switch?")
+//                    Log.d( TAG, "Touch on new cylinder; ignore or switch?")
                     selectedCyl!!.selected = false
                     touchedCylinder!!.selected = true
                 }
             }
             else if ( state == State.GROUP ) {
-                touchedCylinder!!.selected = !touchedCylinder!!.selected
-                val count = cylinders.filter { cyl -> cyl.selected }.size
-                if ( count == 0 )
-                    state = State.SELECT
+                if ( touchedCylinder!!.selected ) {
+                    nextPlane = nextPlane!!.nextAxis()
+//                    Log.d( TAG, "Touch on selected group cylinder, cycle plane to $nextPlane")
+                }
+                else
+                    touchedCylinder!!.selected = true
             }
             else if ( state == State.SELECT ) {
                 touchedCylinder!!.selected = true
@@ -390,22 +401,29 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         //  Log.d( TAG, "Touch at $normalizedX $normalizedY, ray $ray, base point $basePoint")
         preDragState = state
 
-        if ( basePoint == null ) {
-            state = State.PANNING
+        if ( touchedCylinder != null && ( state == State.SINGLE || state == State.GROUP ) ) {
+            preDragState = State.SINGLE
+//            state = State.MOVE
+            mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, touchedCylinder!!.center.asArray()[ nextPlane!!.axis() ] + 0.01f)
+
         }
-        else if ( state == State.SELECT ) {
+        else if ( basePoint != null && state == State.SELECT ) {
 
             // clear selection from existing cylinders
-            clearCylinderSelections()
+//            clearCylinderSelections()
 
-            // add a new point
-            val cylinder = Cylinder(basePoint!!, 0.3f, 0.5f)
+            // add a new item
+            val cylinder = Cylinder(basePoint!!, DEFAULT_ITEM_RADIUS, 0.01f)
+            Log.d( TAG, "create item at $basePoint")
             cylinders.add(cylinder)
 
             preDragState = State.SINGLE
             state = State.MOVE
-            mesh = Mesh( 2.5f, Axis.Z, basePoint!!.z)
-
+            mesh = Mesh( BASE_SIZE / 2f, Axis.Z, basePoint!!.z)
+            nextPlane = Axis.X
+        }
+        else {
+            state = State.PANNING
         }
 
     }
@@ -422,7 +440,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             updateViewMatrices()
         }
         else if ( state == State.MOVE ){
-            val cylinder = cylinders.get( cylinders.size - 1 )
+            val cylinder = cylinders[cylinders.size - 1]
 
             // find intersection of current position with current mesh
             val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
@@ -434,15 +452,21 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     }
 
     fun handleDragEnd(normalizedX: Float, normalizedY: Float) {
-        Log.d( TAG, "Drag end at $normalizedX $normalizedY")
-        state = preDragState
+//        Log.d( TAG, "Drag end at $normalizedX $normalizedY")
         mesh = null
+        state = preDragState
     }
 
     fun handleLongPress() {
         Log.d( TAG, "Long press")
         if ( previousTouch == PreviousTouch.ITEM ) {
-            if ( state == State.SINGLE || state == State.GROUP || state == State.SELECT ) {
+            if ( state == State.GROUP && touchedCylinder!!.selected ) {
+                touchedCylinder!!.selected = false
+                val count = cylinders.filter { cyl -> cyl.selected }.size
+                if ( count == 0 )
+                    state = State.SELECT
+            }
+            else if ( state == State.SINGLE || state == State.SELECT || state == State.GROUP ) {
                 touchedCylinder!!.selected = true
                 state = State.GROUP
             }
