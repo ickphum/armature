@@ -6,7 +6,7 @@ import kotlin.math.sqrt
 
 class Geometry {
 
-    class Point(val x: Float, val y: Float, val z: Float) {
+    class Point(var x: Float, val y: Float, val z: Float) {
 
         constructor( data: FloatArray, offset: Int ) : this( data[ offset], data[ offset + 1], data[ offset + 2 ])
 
@@ -181,6 +181,12 @@ class Geometry {
             data[ offset + 17] = n.z
         }
 
+    }
+
+    class Rectangle( tl: Vector, bl: Vector, br: Vector, tr: Vector  ) {
+        val topTriangle = Triangle( tl, bl, tr )
+        val bottomTriangle = Triangle( bl, br, tr )
+        val plane = Plane( Point( tl.x, tl.y, tl.z ), topTriangle.normal())
     }
 
     companion object Helper {

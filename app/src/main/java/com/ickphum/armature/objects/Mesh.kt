@@ -3,6 +3,7 @@ package com.ickphum.armature.objects
 import android.opengl.GLES20
 import com.ickphum.armature.Constants.POSITION_COMPONENT_COUNT
 import com.ickphum.armature.data.VertexArray
+import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.util.Geometry
 

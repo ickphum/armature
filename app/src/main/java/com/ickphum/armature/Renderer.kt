@@ -27,7 +27,7 @@ import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
 import android.util.Log
-import com.ickphum.armature.objects.Axis
+import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.objects.Mesh
 import com.ickphum.armature.objects.Cylinder
 import com.ickphum.armature.objects.Skybox
@@ -46,6 +46,16 @@ private const val DEFAULT_ITEM_RADIUS = 0.3f
 private const val BASE_SIZE = 5f
 
 class Renderer(context: Context) : GLSurfaceView.Renderer {
+
+    enum class State {
+        SELECT, SINGLE, GROUP, PANNING, MOVE
+    }
+
+    enum class TouchableObjectType {
+        CYLINDER, NODE, BASE
+    }
+    data class TouchedObject( val type: TouchableObjectType, val cylinder: Cylinder.CylinderTouch? )
+    private var touchedObject: TouchedObject? = null
 
     private val context = context;
 
@@ -135,26 +145,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 //        mesh = Mesh( 2.5f, Axis.Z, 0.5f)
 
         cylinderProgram = CylinderShaderProgram( context )
-
-        // triangle tests
-        val t1 = Geometry.Triangle( Geometry.Vector( 0f, 0f, 0f ), Geometry.Vector( 4f, 0f, 0f ), Geometry.Vector( 0f, 0f, 4f ))
-        Log.d( TAG, "Normal to flat triangle ${t1.normal()}")
-
-        val points = arrayOf(
-            Geometry.Point(0f, 0f, 0f),
-            Geometry.Point(-0.01f, 0f, 0f),
-            Geometry.Point(0f, 0f, -0.01f),
-            Geometry.Point(4f, 0f, 0f),
-            Geometry.Point(0f, 0f, 4f),
-            Geometry.Point(4.01f, 0f, 0f),
-            Geometry.Point(0f, 0f, 4.01f),
-            Geometry.Point(1f, 0f, 1f),
-            Geometry.Point(5f, 0f, 0f),
-        )
-        for ( p in points ) {
-            val rc = t1.pointInTriangle( p )
-            Log.d( TAG, "Check point $p $rc")
-        }
 
     }
 
@@ -268,13 +258,15 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
 
+
         cylinderProgram.useProgram()
         cylinderProgram.setUniforms( modelViewProjectionMatrix, vectorToLight )
 
         for ( cyl in cylinders ) {
-            cyl.bindData(cylinderProgram, state, preDragState)
-            cyl.draw()
+            cyl.bindData()
+            cyl.draw(cylinderProgram, state, preDragState)
         }
+
     }
 
     private fun divideByW(vector: FloatArray) {
@@ -330,14 +322,16 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         var maxZ : Float? = null
         touchedCylinder = null
         for (cyl in cylinders) {
-            var hitVec4 = FloatArray( 4 )
+            var hitVec4: FloatArray
             var resultVec4 = FloatArray( 4 )
-            val cylinderHit = cyl.findIntersectionPoint( ray )
+            val cylinderHit = cyl.findIntersectionPoint( ray, modelViewMatrix )
             if ( cylinderHit != null ) {
+
+                Log.d( TAG, "Cylinder hit on ${cylinderHit.element}")
 
                 // ok, basically I saw a post that said "to find the closest vertex, just apply the modelView transform and
                 // then look at the Z values, highest is closest." Seems to work.
-                hitVec4 = floatArrayOf( *cylinderHit.asArray(), 1f )
+                hitVec4 = floatArrayOf( *cylinderHit.point.asArray(), 1f )
                 multiplyMV( resultVec4, 0, modelViewMatrix, 0, hitVec4, 0 )
 //                Log.d( TAG, "Cylinder ${cyl.center.x} hit $cylinderHit -> ${resultVec4[0]},${resultVec4[1]},${resultVec4[2]},${resultVec4[3]}")
                 if ( maxZ == null || resultVec4[2] > maxZ ) {
@@ -402,7 +396,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         preDragState = state
 
         if ( touchedCylinder != null && ( state == State.SINGLE || state == State.GROUP ) ) {
-            preDragState = State.SINGLE
 //            state = State.MOVE
             mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, touchedCylinder!!.center.asArray()[ nextPlane!!.axis() ] + 0.01f)
 
@@ -420,7 +413,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             preDragState = State.SINGLE
             state = State.MOVE
             mesh = Mesh( BASE_SIZE / 2f, Axis.Z, basePoint!!.z)
-            nextPlane = Axis.X
+            nextPlane = Axis.Z
         }
         else {
             state = State.PANNING
@@ -446,7 +439,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
             val meshPoint = mesh!!.findIntersectionPoint(ray)
             if ( meshPoint != null )
-                cylinder.changeHeight( meshPoint.y )
+                cylinder.changeHeight( meshPoint.y, meshPoint.x )
 
         }
     }

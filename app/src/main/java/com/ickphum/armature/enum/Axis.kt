@@ -1,4 +1,4 @@
-package com.ickphum.armature.objects
+package com.ickphum.armature.enum
 
 enum class Axis {
     X {
