@@ -18,8 +18,41 @@ import com.ickphum.armature.util.Geometry.Helper.vectorBetween
 class Cylinder (val center: Geometry.Point, private val radius: Float, var height: Float ) {
 
     enum class CylinderElement {
-        BODY, BOTTOM_X, BOTTOM_Y, BOTTOM_Z, TOP_X, TOP_Y, TOP_Z
+        BODY {
+            override fun axis() = null
+            override fun top() = null
+        },
+        BOTTOM_X {
+            override fun axis() = Axis.X
+            override fun top() = false
+        },
+        BOTTOM_Y {
+            override fun axis() = Axis.Y
+            override fun top() = false
+        },
+        BOTTOM_Z {
+            override fun axis() = Axis.Z
+            override fun top() = false
+        },
+        TOP_X {
+            override fun axis() = Axis.X
+            override fun top() = true
+        },
+        TOP_Y {
+            override fun axis() = Axis.Y
+            override fun top() = true
+        },
+        TOP_Z {
+            override fun axis() = Axis.Z
+            override fun top() = true
+        };
+
+        abstract fun axis(): Axis?
+        abstract fun top(): Boolean?
     }
+
+    data class CylinderTouch( val cylinder: Cylinder, val point: Geometry.Point, val element: CylinderElement )
+
     companion object {
         private const val TOTAL_COMPONENT_COUNT = POSITION_COMPONENT_COUNT + NORMAL_COMPONENT_COUNT
         private const val STRIDE = TOTAL_COMPONENT_COUNT * BYTES_PER_FLOAT
@@ -74,6 +107,13 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, var heigh
     private lateinit var topCenterYPlane: Geometry.Plane
     private lateinit var topCenterZPlane: Geometry.Plane
     private lateinit var topCenterXPlane: Geometry.Plane
+
+    data class HandlePlane(
+        val plane: Geometry.Plane,
+        val center: Geometry.Point,
+        val element: CylinderElement
+    )
+    private var handlePlanes = listOf<HandlePlane>()
 
     var selected = true
 
@@ -159,6 +199,14 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, var heigh
         topCenterYPlane = Geometry.Plane( topCenter, Geometry.Vector(0f, 1f, 0f ))
         topCenterZPlane = Geometry.Plane( topCenter, Geometry.Vector(0f, 0f, 1f ))
 
+        handlePlanes = listOf(
+            HandlePlane(centerXPlane, center, CylinderElement.BOTTOM_X),
+            HandlePlane(centerYPlane, center, CylinderElement.BOTTOM_Y),
+            HandlePlane(centerZPlane, center, CylinderElement.BOTTOM_Z),
+            HandlePlane(topCenterXPlane, topCenter, CylinderElement.TOP_X),
+            HandlePlane(topCenterYPlane, topCenter, CylinderElement.TOP_Y),
+            HandlePlane(topCenterZPlane, topCenter, CylinderElement.TOP_Z),
+        )
     }
 
     // this is obviously similar to generateCirclePoint but is capable of generating circles
@@ -359,7 +407,7 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, var heigh
         else
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, NUMBER_FAN_VERTICES, NUMBER_SIDE_VERTICES)
 
-        if ( selected ) {
+        if ( selected && state != State.MOVE ) {
 //            GLES20.glEnable(GLES20.GL_BLEND)
 //            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE)
 
@@ -384,8 +432,6 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, var heigh
         vertexArray.updateBuffer(vertexData, 0, NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
     }
 
-    data class CylinderTouch( val cylinder: Cylinder, val point: Geometry.Point, val element: CylinderElement )
-
     fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): CylinderTouch? {
 
         val intersections = mutableListOf<CylinderTouch>()
@@ -404,22 +450,16 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, var heigh
                 intersections.add( CylinderTouch( this, touchedPoint, CylinderElement.BODY ) )
         }
 
-        data class HandlePlane( val plane: Geometry.Plane, val center: Geometry.Point, val element: CylinderElement )
-        val handlePlanes = listOf<HandlePlane>(
-            HandlePlane( centerXPlane, center, CylinderElement.BOTTOM_X ),
-            HandlePlane( centerYPlane, center, CylinderElement.BOTTOM_Y ),
-            HandlePlane( centerZPlane, center, CylinderElement.BOTTOM_Z),
-            HandlePlane( topCenterXPlane, topCenter, CylinderElement.TOP_X ),
-            HandlePlane( topCenterYPlane, topCenter, CylinderElement.TOP_Y ),
-            HandlePlane( topCenterZPlane, topCenter, CylinderElement.TOP_Z ),
-        )
-        for ( handlePlane in handlePlanes ) {
-            val point: Geometry.Point? = Geometry.intersectionPoint(ray, handlePlane.plane)
-            if ( point != null ) {
-                val vectorToCenter = vectorBetween( point, handlePlane.center )
-                if ( vectorToCenter.length() < handleRadius ) {
+        if ( selected ) {
+
+            for (handlePlane in handlePlanes) {
+                val point: Geometry.Point? = Geometry.intersectionPoint(ray, handlePlane.plane)
+                if (point != null) {
+                    val vectorToCenter = vectorBetween(point, handlePlane.center)
+                    if (vectorToCenter.length() < handleRadius) {
 //                    Log.d(TAG, "Touched handle ${handlePlane.element}")
-                    intersections.add(CylinderTouch(this, point, handlePlane.element))
+                        intersections.add(CylinderTouch(this, point, handlePlane.element))
+                    }
                 }
             }
         }
@@ -442,6 +482,25 @@ class Cylinder (val center: Geometry.Point, private val radius: Float, var heigh
         }
 
         return closestIntersection
+    }
+
+    fun adjustPosition(offset: Geometry.Vector, element: CylinderElement) {
+        if ( element != CylinderElement.BODY ) {
+            if (element.top() == true ) {
+                if (height + offset.y > 0.01f)
+                    height += offset.y
+            }
+            else if ( height - offset.y > 0.01f && center.y + offset.y > 0f ){
+                center.y += offset.y
+                height -= offset.y
+            }
+        }
+
+        center.x += offset.x
+        center.z += offset.z
+
+        generateVertices()
+        vertexArray.updateBuffer(vertexData, 0, NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
     }
 }
 

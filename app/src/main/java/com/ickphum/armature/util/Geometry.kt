@@ -6,7 +6,7 @@ import kotlin.math.sqrt
 
 class Geometry {
 
-    class Point(var x: Float, val y: Float, val z: Float) {
+    class Point(var x: Float, var y: Float, var z: Float) {
 
         constructor( data: FloatArray, offset: Int ) : this( data[ offset], data[ offset + 1], data[ offset + 2 ])
 
@@ -40,6 +40,10 @@ class Geometry {
 
         fun asArray() : FloatArray {
             return floatArrayOf( x, y, z )
+        }
+
+        fun asVector() : Vector {
+            return Vector( x, y, z )
         }
 
         override fun toString(): String {
