@@ -40,7 +40,7 @@ import javax.microedition.khronos.opengles.GL10
 import kotlin.math.floor
 import kotlin.math.sin
 
-private const val TAG = "3DRenderer"
+private const val TAG = "Renderer"
 private const val DEFAULT_ITEM_RADIUS = 0.3f
 private const val BASE_SIZE = 5f
 
@@ -413,7 +413,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         else if ( touchedObject?.type == TouchableObjectType.BASE && state == State.SELECT ) {
 
             // add a new item
-            val cylinder = Cylinder(touchedObject!!.basePoint!!, DEFAULT_ITEM_RADIUS, 0.01f)
+            val cylinder = Cylinder(touchedObject!!.basePoint!!, touchedObject!!.basePoint!!.translateY( 0.01f ), DEFAULT_ITEM_RADIUS )
             cylinders.add(cylinder)
 
             preDragState = State.SINGLE
