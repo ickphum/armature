@@ -10,6 +10,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://raw.githubusercontent.com/kotlin-graphics/mary/master")
     }
 }
 

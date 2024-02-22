@@ -28,11 +28,11 @@ import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
 import android.util.Log
 import com.ickphum.armature.enum.Axis
-import com.ickphum.armature.objects.Mesh
 import com.ickphum.armature.objects.Cylinder
+import com.ickphum.armature.objects.Mesh
 import com.ickphum.armature.objects.Skybox
-import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.programs.CylinderShaderProgram
+import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.TextureHelper
@@ -142,6 +142,24 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         cylinderProgram = CylinderShaderProgram( context )
 
+//        val p = Geometry.Point(1f, 0f, 0f)
+//        val v = Vec3( Geometry.Vector( 1f, 0f, 1f).normalize().asArray(), 0 )
+//        val q = angleAxis( PIf, v )
+//        val pr = p.rotate( q )
+//        Log.d( TAG, "p $p -> pr $pr")
+//
+//        val v1 = Vec3( Geometry.Vector( 0f, 1f, 0f).normalize().asArray(), 0 )
+//        val v2 = Vec3( Geometry.Vector( 1f, 1f, 0f).normalize().asArray(), 0 )
+//        val angleR = angle( v1, v2 )
+//        Log.d( TAG, "angle $angleR")
+//
+//        // rotation axis test
+//        val rAxis = Geometry.Vector(0f,1f, 0f).crossProduct( Geometry.Vector( 0f, 2f, 1f))
+//        Log.d( TAG, "rAxis $rAxis")
+
+//        val cylinder = Cylinder(Geometry.Point( 0f, 0f, 0f ), Geometry.Point( 1f, 1f, 0f ), DEFAULT_ITEM_RADIUS )
+//        cylinders.add(cylinder)
+//        state = State.SINGLE
     }
 
     override fun onSurfaceChanged(unused: GL10, width: Int, height: Int) {
@@ -162,7 +180,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         drawCylinders()
         drawBase()
     }
-
 
     private fun updateViewMatrices() {
         setIdentityM(viewMatrix, 0)
@@ -323,7 +340,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             val cylinderHit = cyl.findIntersectionPoint( ray, modelViewMatrix )
             if ( cylinderHit != null ) {
 
-                Log.d( TAG, "Cylinder hit on ${cylinderHit.element}")
+//                Log.d( TAG, "Cylinder hit on ${cylinderHit.element}")
 
                 // ok, basically I saw a post that said "to find the closest vertex, just apply the modelView transform and
                 // then look at the Z values, highest is closest." Seems to work.
@@ -475,7 +492,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     }
 
     fun handleLongPress() {
-        Log.d( TAG, "Long press")
+//        Log.d( TAG, "Long press")
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.GROUP && touchedObject!!.touchedCylinder!!.cylinder.selected ) {
                 touchedObject!!.touchedCylinder!!.cylinder.selected = false

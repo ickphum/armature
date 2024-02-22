@@ -2,7 +2,7 @@ package com.ickphum.armature.objects
 
 import android.opengl.GLES20
 import android.opengl.Matrix
-import com.ickphum.armature.*
+import android.util.Log
 import com.ickphum.armature.Constants.BYTES_PER_FLOAT
 import com.ickphum.armature.Constants.NORMAL_COMPONENT_COUNT
 import com.ickphum.armature.Constants.POSITION_COMPONENT_COUNT
@@ -12,10 +12,11 @@ import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.programs.CylinderShaderProgram
 import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.Geometry.Helper.vectorBetween
-import java.text.Normalizer.normalize
+import glm_.glm.angle
+import glm_.glm.angleAxis
+import glm_.vec3.Vec3
 import kotlin.math.cos
 import kotlin.math.sin
-
 
 class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point, private val radius: Float ) {
 
@@ -53,7 +54,11 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
         abstract fun top(): Boolean?
     }
 
-    data class CylinderTouch( val cylinder: Cylinder, val point: Geometry.Point, val element: CylinderElement )
+    data class CylinderTouch(
+        val cylinder: Cylinder,
+        val point: Geometry.Point,
+        val element: CylinderElement
+    )
 
     companion object {
         private const val TOTAL_COMPONENT_COUNT = POSITION_COMPONENT_COUNT + NORMAL_COMPONENT_COUNT
@@ -72,7 +77,8 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
         private const val SIDE_VERTEX_OFFSET = NUMBER_FAN_VERTICES * TOTAL_COMPONENT_COUNT;
 
         // handle offset into vertex data
-        private const val HANDLE_VERTEX_OFFSET = SIDE_VERTEX_OFFSET + SEGMENTS * 2 * 3 * TOTAL_COMPONENT_COUNT
+        private const val HANDLE_VERTEX_OFFSET =
+            SIDE_VERTEX_OFFSET + SEGMENTS * 2 * 3 * TOTAL_COMPONENT_COUNT
 
         // we want to generate points for three (one per axis) sets of handles. Each set
         // has top and bottom handles for individual changes.
@@ -85,10 +91,16 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
 
     }
 
+    // we draw the cylinder vertically to the height matching the distance between top
+    // bottom, then rotate it so that lines up with the actual topCenter
+    private var height = 0f
+    private lateinit var verticalCenter: Geometry.Point
+
     private val handleRadius = radius * 3f
 
     private val NUMBER_SIDE_VERTICES = if (triangleMode) SEGMENTS * 6 else (SEGMENTS + 1) * 2
-    private val NUMBER_VERTICES = NUMBER_FAN_VERTICES + NUMBER_SIDE_VERTICES + NUMBER_HANDLE_VERTICES * 6
+    private val NUMBER_VERTICES =
+        NUMBER_FAN_VERTICES + NUMBER_SIDE_VERTICES + NUMBER_HANDLE_VERTICES * 6
 
     private val vertexData = FloatArray(NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
     private lateinit var vertexArray: VertexArray
@@ -115,6 +127,7 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
         val center: Geometry.Point,
         val element: CylinderElement
     )
+
     private var handlePlanes = listOf<HandlePlane>()
 
     var selected = true
@@ -148,7 +161,17 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
 //            1.0
 //        )
 //    }
+
+    private fun dumpArrayTriplets(array: FloatArray, offset: Int, stride: Int, count: Int, label: String )
+    {
+        for ( i in 0 until count ) {
+            Log.d( TAG, "$label ${offset + i} ${array[ offset + (i * stride)]}, ${array[ offset + (i * stride) + 1 ]}, ${array[ offset + (i * stride) + 2]}")
+        }
+    }
     private fun generateVertices() {
+
+        height = vectorBetween( bottomCenter, topCenter).length()
+        verticalCenter = bottomCenter.translateY( height )
 
         // top circle follows the bottom circle and we do the sides at the same time
         var offset = NUMBER_END_FAN_VERTICES * TOTAL_COMPONENT_COUNT
@@ -156,7 +179,8 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
 
         // fill in the bottom fan first so both end fans are calculated before we do the sides
         addCircleData( vertexData, 0, bottomCenter, radius, SEGMENTS, Axis.Y )
-        addCircleData( vertexData, offset, topCenter, radius, SEGMENTS, Axis.Y )
+
+        addCircleData( vertexData, offset, verticalCenter, radius, SEGMENTS, Axis.Y )
 
         // needed for normal calc
         val centerPoint = Geometry.Point(vertexData, 0)
@@ -181,6 +205,47 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
                 sideOffset += 2 * TOTAL_COMPONENT_COUNT
             }
 
+        }
+
+        // we've generated vertices for a vertical cylinder based at bottomCenter which has
+        // a height to reach topCenter; what we need to do is rotate the cylinder so the top of
+        // it actually matches topCenter.
+        // We're doing this now because the following points (handles) we don't actually want
+        // rotated; we want the handles to remain on the true x/y/z axes.
+        // Steps;
+        // 1. Find the axis of rotation; this is the cross product of a vertical vector and the vector
+        //      from the base to the top translated back to the base.
+        // 2. Find the angle between these vectors
+        // 3. Construct a quaternion based on the 2 above items
+        // 4. For each 3-float component (vertex or normal) in the vertex data, apply the rotation
+        //      using the quaternion and write it back into the vertex data. Vertex points need to
+        //      be translated back relative to bottomCenter, normals do not.
+
+        // 1
+        val vertical = Geometry.Vector( 0f, 1f, 0f )
+        val shiftedTop = Geometry.Vector(topCenter).subtract( bottomCenter ).normalize()
+        val rotationAxis = vertical.crossProduct( shiftedTop ).normalize()
+
+        // 2
+        val rotationAngle = angle( Vec3( vertical.x, vertical.y, vertical.z ), Vec3( shiftedTop.x, shiftedTop.y, shiftedTop.z) )
+
+        // 3
+        val rotationQuat = angleAxis( rotationAngle, rotationAxis.x, rotationAxis.y, rotationAxis.z )
+
+        // 4
+        // each vertex in the object has a position and a normal; they both need rotation, but
+        // the position needs to be shifted back by the base position, rotated, then shifted forward again.
+        var vertexOffset = 0
+        val baseVec3 = Vec3( bottomCenter.x, bottomCenter.y, bottomCenter.z )
+        for ( vertex in 0 until NUMBER_FAN_VERTICES + NUMBER_SIDE_VERTICES ) {
+
+            val positionR = rotationQuat.times( Vec3( vertexData, vertexOffset ).minus( baseVec3 ) ).plus( baseVec3 )
+            positionR.to( vertexData, vertexOffset )
+
+            val normalR = rotationQuat.times( Vec3( vertexData, vertexOffset + POSITION_COMPONENT_COUNT ) )
+            normalR.to( vertexData, vertexOffset + POSITION_COMPONENT_COUNT )
+
+            vertexOffset += TOTAL_COMPONENT_COUNT
         }
 
         // add the handle data for all 6 handles
@@ -343,20 +408,6 @@ class Cylinder (val bottomCenter: Geometry.Point, val topCenter: Geometry.Point,
 
         val topCirclePoint1 = offset - 3 - NORMAL_COMPONENT_COUNT
         val bottomCirclePoint1 = topCirclePoint1 - NUMBER_END_FAN_VERTICES * TOTAL_COMPONENT_COUNT
-//        Log.d( TAG, "top $topCirclePoint1, bottom $bottomCirclePoint1" )
-
-//        Geometry.Vector(vertexData, circlePoint1),
-//        Geometry.Vector(
-//            vertexData[circlePoint1],
-//            vertexData[circlePoint1 + 1] - height,
-//            vertexData[circlePoint1 + 2],
-//        ),
-//        Geometry.Vector(
-//            vertexData[offset],
-//            vertexData[offset + 1] - height,
-//            vertexData[offset + 2],
-//        ),
-//        Geometry.Vector(vertexData, offset)
 
         val rectangle = Geometry.Rectangle(
             Geometry.Vector(vertexData, topCirclePoint1),

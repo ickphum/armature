@@ -1,5 +1,7 @@
 package com.ickphum.armature.util
 
+import glm_.quat.Quat
+import glm_.vec3.Vec3
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -46,6 +48,11 @@ class Geometry {
             return Vector( x, y, z )
         }
 
+        fun rotate( quat: Quat ) : Point {
+            val v = quat.times( Vec3( x, y, z ))
+            return Point( v.x, v.y, v.z )
+        }
+
         override fun toString(): String {
             return "Point[ $x, $y, $z ]"
         }
@@ -70,6 +77,7 @@ class Geometry {
     class Vector(val x: Float, val y: Float, val z: Float) {
 
         constructor( data: FloatArray, offset: Int ) : this( data[ offset], data[ offset + 1], data[ offset + 2 ])
+        constructor( point: Point ) : this( point.x, point.y, point.z )
 
         fun length(): Float {
             return sqrt(
@@ -120,6 +128,11 @@ class Geometry {
         override fun toString(): String {
             return "Vector(x=$x, y=$y, z=$z)"
         }
+
+        fun asArray() : FloatArray {
+            return floatArrayOf( x, y, z )
+        }
+
 
     }
     class Ray(val point: Point, val vector: Vector) {
