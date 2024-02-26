@@ -15,6 +15,11 @@ enum class Axis {
         override fun otherAxes() = intArrayOf(0, 1)
         override fun axis() = 2
         override fun nextAxis() = Axis.X
+    },
+    NONE {
+        override fun otherAxes() = intArrayOf()
+        override fun axis() = -1
+        override fun nextAxis() = Axis.NONE
     };
 
     abstract fun otherAxes(): IntArray

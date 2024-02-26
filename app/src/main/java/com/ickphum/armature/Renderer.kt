@@ -1,5 +1,17 @@
 package com.ickphum.armature
 
+/*
+Plans
+
+Easily snap cylinder(s) back to a plane? Maybe fixed by snapping anyway?
+
+When adjusting an item, show guide planes when a moving end shares a coord with another item,
+and a guide line when 2 coords are shared
+
+Long press on a handle to change the build plane
+
+ */
+
 import android.content.Context
 import android.opengl.GLES20.GL_BLEND
 import android.opengl.GLES20.GL_COLOR_BUFFER_BIT
@@ -16,6 +28,7 @@ import android.opengl.GLES20.glDepthFunc
 import android.opengl.GLES20.glDisable
 import android.opengl.GLES20.glEnable
 import android.opengl.GLES20.glGetString
+import android.opengl.GLES20.glLineWidth
 import android.opengl.GLES20.glViewport
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
@@ -29,9 +42,11 @@ import android.opengl.Matrix.transposeM
 import android.util.Log
 import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.objects.Cylinder
+import com.ickphum.armature.objects.Line
 import com.ickphum.armature.objects.Mesh
 import com.ickphum.armature.objects.Skybox
 import com.ickphum.armature.programs.CylinderShaderProgram
+import com.ickphum.armature.programs.LineShaderProgram
 import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
@@ -53,6 +68,63 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     enum class TouchableObjectType {
         CYLINDER, NODE, BASE
     }
+
+    enum class Congruency {
+        SAME_POINT {
+            override fun meshRequired() = false
+            override fun lineRequired() = false
+            override fun axis() = Axis.NONE
+            override fun score() = 3
+        },
+        SAME_XY {
+            override fun meshRequired() = false
+            override fun lineRequired() = true
+            override fun axis() = Axis.Z
+            override fun score() = 2
+        },
+        SAME_XZ {
+            override fun meshRequired() = false
+            override fun lineRequired() = true
+            override fun axis() = Axis.Y
+            override fun score() = 2
+        },
+        SAME_YZ {
+            override fun meshRequired() = false
+            override fun lineRequired() = true
+            override fun axis() = Axis.X
+            override fun score() = 2
+        },
+        SAME_X {
+            override fun meshRequired() = true
+            override fun lineRequired() = false
+            override fun axis() = Axis.X
+            override fun score() = 1
+        },
+        SAME_Y {
+            override fun meshRequired() = true
+            override fun lineRequired() = false
+            override fun axis() = Axis.Y
+            override fun score() = 1
+        },
+        SAME_Z {
+            override fun meshRequired() = true
+            override fun lineRequired() = false
+            override fun axis() = Axis.Z
+            override fun score() = 1
+        },
+        NONE {
+            override fun meshRequired() = false
+            override fun lineRequired() = false
+            override fun axis() = Axis.NONE
+            override fun score() = 0
+        };
+
+        abstract fun meshRequired() : Boolean
+        abstract fun lineRequired() : Boolean
+        abstract fun axis() : Axis
+        abstract fun score() : Int
+    }
+
     data class TouchedObject(val type: TouchableObjectType, val touchedCylinder: Cylinder.CylinderTouch?, val basePoint: Geometry.Point? )
     private var touchedObject: TouchedObject? = null
 
@@ -94,24 +166,29 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var cylinderProgram: CylinderShaderProgram
     private var cylinders = mutableListOf<Cylinder>( )
 
+    private lateinit var lineProgram: LineShaderProgram
+
     private var xRotation = 0f
     private var yRotation = 25f
 
     private val vectorToLight = Geometry.Vector(2f, 5f, 4f).normalize()
 
-    private val pointLightPositions = floatArrayOf(
-        -1f, 1f, 0f, 1f,
-        0f, 1f, 0f, 1f,
-        1f, 1f, 0f, 1f
-    )
-    private val pointLightColors = floatArrayOf(
-        1.00f, 0.20f, 0.02f,
-        0.02f, 0.15f, 0.02f,
-        0.02f, 0.20f, 1.00f
-    )
-
     private var state = State.SELECT
     private var preDragState = State.SELECT
+
+    data class CongruentPoint(val point: Geometry.Point, val congruency : Congruency ) {
+        var mesh : Mesh? = null
+        var line : Line? = null
+        init {
+            if ( congruency.meshRequired() )
+                mesh = Mesh( BASE_SIZE / 2f, congruency.axis(), point.asArray()[ congruency.axis().axis() ] )
+            if ( congruency.lineRequired() ) {
+                Log.d( TAG,"create CP mesh ${congruency.meshRequired()}, line ${congruency.lineRequired()}" )
+                line = Line(BASE_SIZE / 2f, congruency.axis(), point)
+            }
+        }
+    }
+    private var congruencies = mutableListOf<CongruentPoint>()
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
 
@@ -141,6 +218,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 //        mesh = Mesh( 2.5f, Axis.Z, 0.5f)
 
         cylinderProgram = CylinderShaderProgram( context )
+
+        lineProgram = LineShaderProgram( context )
 
 //        val p = Geometry.Point(1f, 0f, 0f)
 //        val v = Vec3( Geometry.Vector( 1f, 0f, 1f).normalize().asArray(), 0 )
@@ -178,6 +257,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         drawSkybox()
         drawCylinders()
+        drawLines()
         drawBase()
     }
 
@@ -246,6 +326,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE)
+//        glEnable(GL_POINT_SMOOTH)
 
         meshProgram.useProgram()
 
@@ -261,7 +342,30 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             mesh!!.draw()
         }
 
+        meshProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0.1f, 0.3f, 0.2f )
+        for (congruency in congruencies.filter { c -> c.mesh != null } ) {
+            congruency.mesh!!.bindData( meshProgram )
+            congruency.mesh!!.draw()
+        }
+
         glDisable(GL_BLEND)
+    }
+
+    private fun drawLines() {
+
+        setIdentityM(modelMatrix, 0);
+        updateMvpMatrix();
+
+        glLineWidth( 10f )
+
+        lineProgram.useProgram()
+
+        lineProgram.setUniforms( modelViewProjectionMatrix, 0f, 0.8f, 0.1f )
+
+        for (congruency in congruencies.filter { c -> c.line != null } ) {
+            congruency.line!!.bindData( lineProgram )
+            congruency.line!!.draw()
+        }
     }
 
     private fun drawCylinders() {
@@ -430,16 +534,17 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         else if ( touchedObject?.type == TouchableObjectType.BASE && state == State.SELECT ) {
 
             // add a new item
-            val cylinder = Cylinder(touchedObject!!.basePoint!!, touchedObject!!.basePoint!!.translateY( 0.01f ), DEFAULT_ITEM_RADIUS )
+            val snappedBasePoint = base.nearestSnapPoint( touchedObject!!.basePoint!! )
+            val cylinder = Cylinder(snappedBasePoint!!, snappedBasePoint!!.translateY( 0.01f ), DEFAULT_ITEM_RADIUS )
             cylinders.add(cylinder)
 
             preDragState = State.SINGLE
             state = State.MOVE
-            mesh = Mesh( BASE_SIZE / 2f, Axis.Z, touchedObject!!.basePoint!!.z)
+            mesh = Mesh( BASE_SIZE / 2f, Axis.Z, snappedBasePoint!!.z)
             nextPlane = Axis.Z
 
             // change touchedObject to emulate a click on the top Z handle of the new cylinder
-            previousMeshPoint = touchedObject!!.basePoint!!.translateY( 0.01f )
+            previousMeshPoint = snappedBasePoint.translateY( 0.01f )
             touchedObject = TouchedObject( TouchableObjectType.CYLINDER,
                 Cylinder.CylinderTouch( cylinder, previousMeshPoint!!, Cylinder.CylinderElement.TOP_Z ),
                 null )
@@ -447,6 +552,39 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         else {
             state = State.PANNING
         }
+
+    }
+
+    fun checkForCongruency( point : Geometry.Point, otherEnd : Geometry.Point, otherSelected: Boolean, sameEnd : Geometry.Point) {
+
+        // we're going to check the moving point against both ends of the other item, and
+        // the best match wins; X+Y+Z beats any 2 beats any 1. (ignored for now, we report both)
+
+        // check other end
+        var otherEndCongruency = point.findCongruency(otherEnd)
+
+        // only check unselected elements for same end matches; other selected
+        // elements a) are more likely to match from the outset, and b) are moving
+        // in sync with this item so matches won't change
+        var sameEndCongruency : Congruency? = null
+        if (!otherSelected)
+            sameEndCongruency = point.findCongruency(sameEnd)
+
+        if (otherEndCongruency != Congruency.NONE)
+            if (sameEndCongruency == null || sameEndCongruency == Congruency.NONE)
+                congruencies.add(CongruentPoint(point, otherEndCongruency))
+            else
+                if ( otherEndCongruency.score() > sameEndCongruency!!.score() )
+                    congruencies.add(CongruentPoint(point, otherEndCongruency ))
+                else if ( otherEndCongruency.score() < sameEndCongruency!!.score() )
+                    congruencies.add(CongruentPoint(point, sameEndCongruency ))
+                else {
+                    congruencies.add(CongruentPoint(point, otherEndCongruency ))
+                    congruencies.add(CongruentPoint(point, sameEndCongruency ))
+                }
+        else
+            if (sameEndCongruency != null && sameEndCongruency != Congruency.NONE)
+                congruencies.add(CongruentPoint(point, sameEndCongruency!!))
 
     }
 
@@ -468,17 +606,54 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             val meshPoint = mesh!!.findIntersectionPoint(ray)
             if (meshPoint != null) {
 
+                val activeCylinder = touchedObject!!.touchedCylinder!!.cylinder
+                val element = touchedObject!!.touchedCylinder!!.element
+
+                // if we're snapping points, we have to find out how the active cylinder moves,
+                // and then apply the top &/or bottom offsets to the other cylinders in the group.
+                val offset = meshPoint.subtract(previousMeshPoint!!)
+                previousMeshPoint = meshPoint
+
+                val previousTop = activeCylinder.topCenter
+                val previousBottom = activeCylinder.bottomCenter
+
                 // we have the original point where the touch was detected on the object,
                 // which should lie on the same plane as the mesh. We can calculate the offset
-                // of the current mesh position (which should only be different in 2 axes) and
-                // apply that to all selected objects.
-                val offset = meshPoint.subtract(previousMeshPoint!!)
-                for (cylinder in cylinders.filter { cyl -> cyl.selected } ) {
-                    cylinder.adjustPosition(
-                        offset.asVector(),
-                        touchedObject!!.touchedCylinder!!.element
-                    )
-                    previousMeshPoint = meshPoint
+                // of the current mesh position (which should only be different in 2 axes).
+                activeCylinder.adjustSnappedPosition(
+                    offset.asVector(),
+                    element,
+                    mesh!!
+                )
+
+                val topOffset = activeCylinder.topCenter.subtract( previousTop ).asVector()
+                val bottomOffset = activeCylinder.bottomCenter.subtract( previousBottom ).asVector()
+                if ( topOffset.length() > 0f || bottomOffset.length() > 0f ) {
+
+                    // apply the offsets to all other selected objects.
+                    for (cylinder in cylinders.filter { cyl -> cyl.selected && cyl != activeCylinder } ) {
+                        cylinder.changePosition( topOffset, bottomOffset )
+                    }
+
+                }
+
+                // check for congruencies, ie shared points/lines/planes
+                congruencies.clear()
+                for (cylinder in cylinders.filter { c -> c.selected } ) {
+
+                    // check against all other cylinders
+                    for (other in cylinders.filter { o -> o !== cylinder } ) {
+
+                        // only check the moving end
+                        if ( element == Cylinder.CylinderElement.BODY || element.top() == true ) {
+                            checkForCongruency( cylinder.topCenter, other.bottomCenter, other.selected, other.topCenter )
+                        }
+
+                        if ( element == Cylinder.CylinderElement.BODY || element.top() != true ) {
+                            checkForCongruency( cylinder.bottomCenter, other.topCenter, other.selected, other.bottomCenter )
+                        }
+
+                    }
                 }
             }
 
@@ -489,6 +664,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 //        Log.d( TAG, "Drag end at $normalizedX $normalizedY")
         mesh = null
         state = preDragState
+        congruencies.clear()
     }
 
     fun handleLongPress() {

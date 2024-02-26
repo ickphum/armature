@@ -10,4 +10,6 @@ void main()
 //    tempPos.y += pct;
 //    gl_Position = u_Matrix * vec4(tempPos, 1.0);
     gl_Position = u_Matrix * vec4(a_Position, 1.0);
+    gl_PointSize = 12.5;
+
 }

@@ -1,5 +1,6 @@
 package com.ickphum.armature.util
 
+import com.ickphum.armature.Renderer
 import glm_.quat.Quat
 import glm_.vec3.Vec3
 import kotlin.math.abs
@@ -53,8 +54,37 @@ class Geometry {
             return Point( v.x, v.y, v.z )
         }
 
+        fun findCongruency( point : Point) : Renderer.Congruency {
+            val small = 0.03
+            val sameX = if ( abs( x - point.x ) < small ) 4 else 0
+            val sameY = if ( abs( y - point.y ) < small ) 2 else 0
+            val sameZ = if ( abs( z - point.z ) < small ) 1 else 0
+            val bits = sameX or sameY or sameZ
+//            Log.d( TAG, "FC $x,$y,$z against $point -> $sameX, $sameY, $sameZ, $bits")
+            val data = mapOf<Int, Renderer.Congruency>(
+                0b111 to Renderer.Congruency.SAME_POINT,
+                0b110 to Renderer.Congruency.SAME_XY,
+                0b101 to Renderer.Congruency.SAME_XZ,
+                0b011 to Renderer.Congruency.SAME_YZ,
+                0b100 to Renderer.Congruency.SAME_X,
+                0b010 to Renderer.Congruency.SAME_Y,
+                0b001 to Renderer.Congruency.SAME_Z,
+                0b000 to Renderer.Congruency.NONE
+            )
+            return data[ bits ]!!
+        }
+
         override fun toString(): String {
             return "Point[ $x, $y, $z ]"
+        }
+
+        // quasi-array access
+        operator fun get(i: Int): Float {
+            return if ( i == 0 ) x else if ( i == 1 ) y else z
+        }
+
+        companion object {
+            private const val TAG = "Point"
         }
     }
 
