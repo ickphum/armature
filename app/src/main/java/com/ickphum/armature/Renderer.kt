@@ -39,9 +39,11 @@ import android.opengl.Matrix.rotateM
 import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
+import android.os.SystemClock
 import android.util.Log
 import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.objects.Cylinder
+import com.ickphum.armature.objects.Icosahedron
 import com.ickphum.armature.objects.Line
 import com.ickphum.armature.objects.Mesh
 import com.ickphum.armature.objects.Skybox
@@ -51,6 +53,8 @@ import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.programs.SkyboxShaderProgram
 import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.TextureHelper
+import glm_.glm
+import glm_.vec3.Vec3
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.floor
 import kotlin.math.sin
@@ -58,8 +62,9 @@ import kotlin.math.sin
 private const val TAG = "Renderer"
 private const val DEFAULT_ITEM_RADIUS = 0.3f
 private const val BASE_SIZE = 5f
+private const val NODE_RADIUS = 0.625f
 
-class Renderer(context: Context) : GLSurfaceView.Renderer {
+class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     enum class State {
         SELECT, SINGLE, GROUP, PANNING, MOVE
@@ -67,6 +72,10 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
     enum class TouchableObjectType {
         CYLINDER, NODE, BASE
+    }
+
+    enum class LightRotation {
+        X, Y, Z, None
     }
 
     enum class Congruency {
@@ -126,9 +135,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     }
 
     data class TouchedObject(val type: TouchableObjectType, val touchedCylinder: Cylinder.CylinderTouch?, val basePoint: Geometry.Point? )
-    private var touchedObject: TouchedObject? = null
 
-    private val context = context;
+    private var touchedObject: TouchedObject? = null
 
     private val projectionMatrix = FloatArray(16)
     private val modelMatrix = FloatArray(16)
@@ -151,6 +159,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private lateinit var base: Mesh
     private var mesh: Mesh? = null
     private var previousMeshPoint: Geometry.Point? = null
+    private var snapHandle: Geometry.Point? = null
+    private var prevHandleOffset = Geometry.Vector ( 0f, 0f, 0f )
 
     // this will hold the axis for the dragging plane for the next item edit;
     // it will always be reset by the creation of the first item so there's no point
@@ -171,7 +181,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     private var xRotation = 0f
     private var yRotation = 25f
 
-    private val vectorToLight = Geometry.Vector(2f, 5f, 4f).normalize()
+    private var vectorToLight = Geometry.Vector(3f, 5f, 10f).normalize()
+    private val rotation: LightRotation = LightRotation.None
 
     private var state = State.SELECT
     private var preDragState = State.SELECT
@@ -179,6 +190,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     data class CongruentPoint(val point: Geometry.Point, val congruency : Congruency ) {
         var mesh : Mesh? = null
         var line : Line? = null
+        var icosahedron: Icosahedron? = null
         init {
             if ( congruency.meshRequired() )
                 mesh = Mesh( BASE_SIZE / 2f, congruency.axis(), point.asArray()[ congruency.axis().axis() ] )
@@ -186,9 +198,18 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
                 Log.d( TAG,"create CP mesh ${congruency.meshRequired()}, line ${congruency.lineRequired()}" )
                 line = Line(BASE_SIZE / 2f, congruency.axis(), point)
             }
+            if ( congruency === Congruency.SAME_POINT )
+                icosahedron = Icosahedron( NODE_RADIUS, point.asVector() )
         }
     }
-    private var congruencies = mutableListOf<CongruentPoint>()
+    private val congruencies = mutableListOf<CongruentPoint>()
+
+    data class Node( val point: Geometry.Point, val items: List<Cylinder> ) {
+        val icosahedron = Icosahedron( NODE_RADIUS, point.asVector() )
+    }
+    private val nodes = mutableListOf<Node>()
+
+    // private var testIco : Icosahedron? = null
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
 
@@ -201,9 +222,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         Log.d( TAG, "************** version $version ******************")
 
         globalStartTime = System.nanoTime();
-
-        val angleVarianceInDegrees = 5f;
-        val speedVariance = 1f;
 
         skyboxProgram = SkyboxShaderProgram( context )
         skybox = Skybox()
@@ -239,6 +257,8 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 //        val cylinder = Cylinder(Geometry.Point( 0f, 0f, 0f ), Geometry.Point( 1f, 1f, 0f ), DEFAULT_ITEM_RADIUS )
 //        cylinders.add(cylinder)
 //        state = State.SINGLE
+
+//        testIco = Icosahedron( 0.625f, Geometry.Vector( 1f, 1f, -2f ))
     }
 
     override fun onSurfaceChanged(unused: GL10, width: Int, height: Int) {
@@ -254,6 +274,16 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
     override fun onDrawFrame(glUnused: GL10?) {
         // Clear the rendering surface.
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT )
+
+        if ( rotation === LightRotation.Y ) {
+            val time = SystemClock.uptimeMillis() % 6280
+            val angle = 0.002f * time.toInt()
+
+            val rotationAxis = Geometry.Vector(0f, 1f, 0f)
+            val rotationQuat = glm.angleAxis(angle, rotationAxis.x, rotationAxis.y, rotationAxis.z)
+            val positionR = rotationQuat.times(Vec3(2f, 0f, 0f))
+            vectorToLight.fromVec3(positionR)
+        }
 
         drawSkybox()
         drawCylinders()
@@ -375,15 +405,22 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
 
-
         cylinderProgram.useProgram()
         cylinderProgram.setUniforms( modelViewProjectionMatrix, vectorToLight )
 
         for ( cyl in cylinders ) {
             cyl.bindData()
+            // @todo pass in nextPlane so we can indicate the body move plane via the handle
             cyl.draw(cylinderProgram, state, preDragState)
         }
 
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_ONE, GL_ONE)
+        for (congruency in congruencies.filter { c -> c.icosahedron != null } ) {
+            congruency.icosahedron!!.bindData()
+            congruency.icosahedron!!.draw( cylinderProgram )
+        }
+        glDisable(GL_BLEND)
     }
 
     private fun divideByW(vector: FloatArray) {
@@ -391,6 +428,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         vector[1] /= vector[3]
         vector[2] /= vector[3]
     }
+
     private fun convertNormalized2DPointToRay(
         normalizedX: Float, normalizedY: Float
     ): Geometry.Ray {
@@ -440,7 +478,7 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         touchedObject = null
         for (cyl in cylinders) {
             var hitVec4: FloatArray
-            var resultVec4 = FloatArray( 4 )
+            val resultVec4 = FloatArray( 4 )
             val cylinderHit = cyl.findIntersectionPoint( ray, modelViewMatrix )
             if ( cylinderHit != null ) {
 
@@ -467,6 +505,11 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
                 val axis = touchedObject!!.touchedCylinder!!.element.axis()
                 if ( axis != null )
                     nextPlane = axis
+                previousMeshPoint = touchedObject!!.touchedCylinder!!.point
+                mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, previousMeshPoint!!.asArray()[ nextPlane!!.axis() ] )
+
+                // recalculate the snap points around the touched point
+                mesh!!.findIntersectionPoint( ray )
             }
         }
         else {
@@ -484,15 +527,18 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
         return previousTouch.ordinal
     }
 
-    fun handleShortPress(normalizedX: Float, normalizedY: Float) {
+    fun handleShortPress( normalizedX: Float, normalizedY: Float) {
 //        Log.d( TAG, "Short press at $normalizedX $normalizedY")
 
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.SINGLE ) {
                 val selectedCyl = cylinders.find { cylinder -> cylinder.selected  }
                 if ( selectedCyl == touchedObject!!.touchedCylinder!!.cylinder ) {
+
+                    // note that touching a handle will immediately reset nextPlane as required
                     nextPlane = nextPlane!!.nextAxis()
-                    Log.d( TAG, "Touch on selected cylinder, cycle plane to $nextPlane")
+                    Log.d( TAG, "Touch 1 on selected cylinder, cycle plane to $nextPlane")
+
                 }
                 else {
 //                    Log.d( TAG, "Touch on new cylinder; ignore or switch?")
@@ -528,23 +574,31 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             && ( state == State.SINGLE || state == State.GROUP ) )
         {
             state = State.MOVE
-            previousMeshPoint = touchedObject!!.touchedCylinder!!.point
-            mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, previousMeshPoint!!.asArray()[ nextPlane!!.axis() ] + 0.01f)
+//            previousMeshPoint = touchedObject!!.touchedCylinder!!.point
+            touchedObject!!.touchedCylinder!!.cylinder.startPositionChange()
+//            mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, previousMeshPoint!!.asArray()[ nextPlane!!.axis() ] )
+            snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )
+            prevHandleOffset = Geometry.Vector(0f, 0f ,0f)
+
+            Log.d( TAG, "Start move 1 on $nextPlane from $snapHandle, cylinder ${touchedObject!!.touchedCylinder!!.cylinder}")
         }
         else if ( touchedObject?.type == TouchableObjectType.BASE && state == State.SELECT ) {
 
+            snapHandle = base.nearestSnapPoint( touchedObject!!.basePoint!! )
+            prevHandleOffset = Geometry.Vector(0f, 0f ,0f)
+
             // add a new item
-            val snappedBasePoint = base.nearestSnapPoint( touchedObject!!.basePoint!! )
-            val cylinder = Cylinder(snappedBasePoint!!, snappedBasePoint!!.translateY( 0.01f ), DEFAULT_ITEM_RADIUS )
+            val cylinder = Cylinder(snapHandle!!, snapHandle!!.translateY( 0.01f ), DEFAULT_ITEM_RADIUS )
             cylinders.add(cylinder)
 
             preDragState = State.SINGLE
             state = State.MOVE
-            mesh = Mesh( BASE_SIZE / 2f, Axis.Z, snappedBasePoint!!.z)
+            mesh = Mesh( BASE_SIZE / 2f, Axis.Z, snapHandle!!.z)
+
             nextPlane = Axis.Z
 
             // change touchedObject to emulate a click on the top Z handle of the new cylinder
-            previousMeshPoint = snappedBasePoint.translateY( 0.01f )
+            previousMeshPoint = snapHandle!!.translateY( 0.01f )
             touchedObject = TouchedObject( TouchableObjectType.CYLINDER,
                 Cylinder.CylinderTouch( cylinder, previousMeshPoint!!, Cylinder.CylinderElement.TOP_Z ),
                 null )
@@ -555,36 +609,92 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
     }
 
-    fun checkForCongruency( point : Geometry.Point, otherEnd : Geometry.Point, otherSelected: Boolean, sameEnd : Geometry.Point) {
+    private fun checkForCongruency(element: Cylinder.CylinderElement, cylinder: Cylinder, other: Cylinder) {
 
-        // we're going to check the moving point against both ends of the other item, and
-        // the best match wins; X+Y+Z beats any 2 beats any 1. (ignored for now, we report both)
+        // we're moving one end of the cylinder or the whole thing ie both ends. We want to know
+        // when one of the moving ends come into congruence with an existing cylinder, by which we
+        // mean either the top or bottom end of the existing cylinder.
+        // We check the moving end(s) against both ends of unselected cylinders; for selected cylinders,
+        // we only check the end that isn't moving, since the moving end is, uh, moving, so the relationship
+        // between the moving end(s) of the selected cylinders won't change.
 
-        // check other end
-        var otherEndCongruency = point.findCongruency(otherEnd)
+        // We're finding these congruencies for two reasons:
+        //  1) We want to display meshes and lines to help the user line up items
+        //  2) We want to know what cylinder ends may be joined to create a new node
+        // The upshot is that we only want to see one congruency of each type; for display purposes,
+        // one is enough, and for creating a node, we want each cylinder that matches the node location.
+        // What we'll do is find all the congruencies for this pair, and then check them against the
+        // existing congruencies. If we find matches by Congruency.type, we either skip them, or
+        // in the case of Congruency.SAME_POINT, we add the other cylinder to the existing congruency
+        // so if the node is created, we have a complete list of cylinders linked to the node.
 
-        // only check unselected elements for same end matches; other selected
-        // elements a) are more likely to match from the outset, and b) are moving
-        // in sync with this item so matches won't change
-        var sameEndCongruency : Congruency? = null
-        if (!otherSelected)
-            sameEndCongruency = point.findCongruency(sameEnd)
+        // @todo
+        // We could also check for congruencies at regular subdivisions of the each cylinder's
+        // length, eg halfway, etc. For now, just create multiple cylinders.
+        // Also, we show when joined cylinders were aligned at given angles eg 0 (ie collinear),
+        // 45, 90, etc.
 
-        if (otherEndCongruency != Congruency.NONE)
-            if (sameEndCongruency == null || sameEndCongruency == Congruency.NONE)
-                congruencies.add(CongruentPoint(point, otherEndCongruency))
-            else
-                if ( otherEndCongruency.score() > sameEndCongruency!!.score() )
-                    congruencies.add(CongruentPoint(point, otherEndCongruency ))
-                else if ( otherEndCongruency.score() < sameEndCongruency!!.score() )
-                    congruencies.add(CongruentPoint(point, sameEndCongruency ))
-                else {
-                    congruencies.add(CongruentPoint(point, otherEndCongruency ))
-                    congruencies.add(CongruentPoint(point, sameEndCongruency ))
-                }
-        else
-            if (sameEndCongruency != null && sameEndCongruency != Congruency.NONE)
-                congruencies.add(CongruentPoint(point, sameEndCongruency!!))
+        // create a temp class for this as creating instances of CongruentPoint invokes the
+        // 3D object init for the type of congruency
+        data class TempCongruentPoint (val point : Geometry.Point, val congruency: Congruency )
+        val newCongruencies = mutableListOf<TempCongruentPoint>()
+
+        // check cylinder.top vs other.bottom for any other cylinder,
+        // and cylinder.top vs other.top for an unselected other cylinder.
+        // If we are doing both checks (ie other is unselected), the checks don't
+        // short-circuit; it's possible for one end to match both ends of the other cylinder
+        // in different planes.
+        if (element.top())
+        {
+
+            // Since we're going to check the list of new congruencies for duplicates against
+            // existing congruencies anyway, there's no point in checking they're not NONE
+            // at this point
+            newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.bottomCenter) ) )
+            if (!other.selected)
+                newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.topCenter) ) )
+        }
+
+        // ditto for bottom
+        if ( element.bottom() )
+        {
+            newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.topCenter) ) )
+            if (!other.selected)
+                newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.bottomCenter) ) )
+        }
+
+
+        // we now have either 1, 2 or 4 potential new congruencies; filter out NONEs
+        // and check the others against the existing list
+        for ( newC in newCongruencies.filter { nc -> nc.congruency != Congruency.NONE } )
+        {
+//            Log.d( TAG, "Check real congruency ${newC.congruency}")
+            // @todo
+            //  doesn't work for group moves with full group checking; have to check the relevant parts of the point
+            // as well; two separate cylinders can both have XY matches, for example.
+            // However, for now we're only checking the actual touched cylinder for congruencies,
+            // so this doesn't arise. One reason we're doing this is that it could get very crowded
+            // visually if we're showing all congruencies for all group cylinders + all existing cylinders.
+            // This way, the key cylinder can be selected for the move and only that one is displayed.
+            //            val sameCongruencies = congruencies.filter { cp -> cp.congruency == newC.congruency }
+            //            if (sameCongruencies.isNotEmpty())
+            //            {
+            //                // we need to check each existing congruency and see if the new one is really new.
+            //                // For a plane congruency, say SAME_X, we'd check the X coords of the 2 congruency's points.
+            //                // For a line congruent, say SAME_XY, we'd check both the X and Y coords.
+            //                // For a full or point congruency, we'd check all 3, and it is valid to have 2
+            //                // different such congruencies; imagine setting up 2 vertical cylinders, then 2
+            //                // angled cylinders with the same spacing, and then moving both angled cylinders onto
+            //                // the verticals.
+            //            }
+
+            if ( newC.congruency === Congruency.SAME_POINT )
+            {
+                // check for existing nodes at the same point, whether just created or existing
+            }
+            else if ( congruencies.firstOrNull { cp -> cp.congruency == newC.congruency } == null )
+                congruencies.add( CongruentPoint( newC.point, newC.congruency ) )
+        }
 
     }
 
@@ -606,52 +716,35 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
             val meshPoint = mesh!!.findIntersectionPoint(ray)
             if (meshPoint != null) {
 
-                val activeCylinder = touchedObject!!.touchedCylinder!!.cylinder
                 val element = touchedObject!!.touchedCylinder!!.element
 
-                // if we're snapping points, we have to find out how the active cylinder moves,
-                // and then apply the top &/or bottom offsets to the other cylinders in the group.
-                val offset = meshPoint.subtract(previousMeshPoint!!)
-                previousMeshPoint = meshPoint
+                // if we're snapping points, we have to find out how the handle moves,
+                // and then apply the offset to the other cylinders in the group.
+                val newHandle = mesh!!.nearestSnapPoint( meshPoint )
+                val delta = newHandle!!.subtract( snapHandle!! ).asVector()
 
-                val previousTop = activeCylinder.topCenter
-                val previousBottom = activeCylinder.bottomCenter
-
-                // we have the original point where the touch was detected on the object,
-                // which should lie on the same plane as the mesh. We can calculate the offset
-                // of the current mesh position (which should only be different in 2 axes).
-                activeCylinder.adjustSnappedPosition(
-                    offset.asVector(),
-                    element,
-                    mesh!!
-                )
-
-                val topOffset = activeCylinder.topCenter.subtract( previousTop ).asVector()
-                val bottomOffset = activeCylinder.bottomCenter.subtract( previousBottom ).asVector()
-                if ( topOffset.length() > 0f || bottomOffset.length() > 0f ) {
-
+                if ( delta.length() > 0f )
+                {
                     // apply the offsets to all other selected objects.
-                    for (cylinder in cylinders.filter { cyl -> cyl.selected && cyl != activeCylinder } ) {
-                        cylinder.changePosition( topOffset, bottomOffset )
+                    for (cylinder in cylinders.filter { cyl -> cyl.selected } ) {
+                        cylinder.changePosition( if (element.top()) delta else null, if (element.bottom()) delta else null )
                     }
 
                 }
+                snapHandle = newHandle
 
                 // check for congruencies, ie shared points/lines/planes
                 congruencies.clear()
                 for (cylinder in cylinders.filter { c -> c.selected } ) {
 
+//                    if ( cylinder == activeCylinder ) Log.d( TAG, "Moving active cylinder")
+//                    if ( cylinder != activeCylinder ) Log.d( TAG, "Moving group cylinder")
+
                     // check against all other cylinders
                     for (other in cylinders.filter { o -> o !== cylinder } ) {
 
-                        // only check the moving end
-                        if ( element == Cylinder.CylinderElement.BODY || element.top() == true ) {
-                            checkForCongruency( cylinder.topCenter, other.bottomCenter, other.selected, other.topCenter )
-                        }
-
-                        if ( element == Cylinder.CylinderElement.BODY || element.top() != true ) {
-                            checkForCongruency( cylinder.bottomCenter, other.topCenter, other.selected, other.bottomCenter )
-                        }
+                        // only check the moving end; both ends move when selection == BODY
+                        checkForCongruency( element, cylinder, other )
 
                     }
                 }
@@ -662,8 +755,12 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
 
     fun handleDragEnd(normalizedX: Float, normalizedY: Float) {
 //        Log.d( TAG, "Drag end at $normalizedX $normalizedY")
+
         mesh = null
         state = preDragState
+        for ( point in congruencies.filter { it.congruency == Congruency.SAME_POINT } ) {
+//            nodes.add( No)
+        }
         congruencies.clear()
     }
 
@@ -681,7 +778,6 @@ class Renderer(context: Context) : GLSurfaceView.Renderer {
                 state = State.GROUP
             }
         }
-
     }
 
 }

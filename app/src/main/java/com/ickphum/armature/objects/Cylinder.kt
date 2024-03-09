@@ -24,35 +24,43 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
     enum class CylinderElement {
         BODY {
             override fun axis() = null
-            override fun top() = null
+            override fun top() = true
+            override fun bottom() = true
         },
         BOTTOM_X {
             override fun axis() = Axis.X
             override fun top() = false
+            override fun bottom() = true
         },
         BOTTOM_Y {
             override fun axis() = Axis.Y
             override fun top() = false
+            override fun bottom() = true
         },
         BOTTOM_Z {
             override fun axis() = Axis.Z
             override fun top() = false
+            override fun bottom() = true
         },
         TOP_X {
             override fun axis() = Axis.X
             override fun top() = true
+            override fun bottom() = false
         },
         TOP_Y {
             override fun axis() = Axis.Y
             override fun top() = true
+            override fun bottom() = false
         },
         TOP_Z {
             override fun axis() = Axis.Z
             override fun top() = true
+            override fun bottom() = false
         };
 
         abstract fun axis(): Axis?
-        abstract fun top(): Boolean?
+        abstract fun top(): Boolean
+        abstract fun bottom(): Boolean
     }
 
     data class CylinderTouch(
@@ -90,7 +98,12 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         private const val HANDLE_SEGMENTS = 24
         private const val NUMBER_HANDLE_VERTICES = HANDLE_SEGMENTS + 2
 
+        private var classIndex = 0
+        fun nextIndex() = classIndex++
+        fun resetIndex(index : Int ) = run { classIndex = index }
     }
+
+    var index = Cylinder.nextIndex()
 
     private var previousBottomOffset = Geometry.Vector( 0f, 0f, 0f )
     private var previousTopOffset = Geometry.Vector( 0f, 0f, 0f )
@@ -102,16 +115,15 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
 
     private val handleRadius = radius * 3f
 
-    private val NUMBER_SIDE_VERTICES = if (triangleMode) SEGMENTS * 6 else (SEGMENTS + 1) * 2
-    private val NUMBER_VERTICES =
-        NUMBER_FAN_VERTICES + NUMBER_SIDE_VERTICES + NUMBER_HANDLE_VERTICES * 6
+    private val numberSideVertices = if (triangleMode) SEGMENTS * 6 else (SEGMENTS + 1) * 2
+    private val numberVertices = NUMBER_FAN_VERTICES + numberSideVertices + NUMBER_HANDLE_VERTICES * 6
 
-    private val vertexData = FloatArray(NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
+    private val vertexData = FloatArray(numberVertices * TOTAL_COMPONENT_COUNT)
     private lateinit var vertexArray: VertexArray
 
-    private val singleColor = floatArrayOf(0.3f, 0.7f, 0.3f, 1f)
+    private val singleColor = floatArrayOf(0.5f, 0.9f, 0.5f, 1f)
     private val groupColor = floatArrayOf(0.97f, 0.53f, 0.08f, 1f)
-    private val normalColor = floatArrayOf(0.5f, 0.1f, 0.1f, 1f)
+    private val normalColor = floatArrayOf(0.7f, 0.1f, 0.1f, 1f)
     private val handleColor = floatArrayOf(0.5f, 0.1f, 0.5f, 1f)
 
     // these rectangles are used for touch detection
@@ -131,6 +143,8 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         val center: Geometry.Point,
         val element: CylinderElement
     )
+
+    override fun toString() = "Cylinder $index"
 
     private var handlePlanes = listOf<HandlePlane>()
 
@@ -214,15 +228,14 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
             )
 
             // 3
-            val rotationQuat =
-                angleAxis(rotationAngle, rotationAxis.x, rotationAxis.y, rotationAxis.z)
+            val rotationQuat = angleAxis(rotationAngle, rotationAxis.x, rotationAxis.y, rotationAxis.z)
 
             // 4
             // each vertex in the object has a position and a normal; they both need rotation, but
             // the position needs to be shifted back by the base position, rotated, then shifted forward again.
             var vertexOffset = 0
             val baseVec3 = Vec3(bottomCenter.x, bottomCenter.y, bottomCenter.z)
-            for (vertex in 0 until NUMBER_FAN_VERTICES + NUMBER_SIDE_VERTICES) {
+            for (vertex in 0 until NUMBER_FAN_VERTICES + numberSideVertices) {
 
                 val positionR = rotationQuat.times(Vec3(vertexData, vertexOffset).minus(baseVec3))
                     .plus(baseVec3)
@@ -301,7 +314,7 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         val mainAxis = axis.axis()
         val otherAxes = axis.otherAxes()
 
-//        Log.d( TAG, "axis $mainAxis, otherAxes[0] ${otherAxes[0]}, otherAxes[1] ${otherAxes[1]}")
+        //        Log.d( TAG, "axis $mainAxis, otherAxes[0] ${otherAxes[0]}, otherAxes[1] ${otherAxes[1]}")
 
         // centre of triangle fan
         vertexData[offset++] = center.x
@@ -311,7 +324,7 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
 //        Log.d( TAG, "center fan ${vertexData[initialOffset + 0]}, ${vertexData[initialOffset + 1]}, ${vertexData[initialOffset + 2]}")
 
         // normal array is init to 0, just set the main axis for the center normal
-        normalArray[ mainAxis ] = 1f
+        normalArray[ mainAxis ] = if ( initialOffset == 0 ) -1f else 1f // such a hack...
         vertexData[offset++] = normalArray[ 0 ]
         vertexData[offset++] = normalArray[ 1 ]
         vertexData[offset++] = normalArray[ 2 ]
@@ -413,12 +426,12 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
     fun bindData() {
         vertexArray.setVertexAttribPointer(
             0,
-            0, // program.getPositionAttributeLocation(),
+            0,
             POSITION_COMPONENT_COUNT, STRIDE
         )
         vertexArray.setVertexAttribPointer(
             POSITION_COMPONENT_COUNT,
-            1, // program.getNormalAttributeLocation(),
+            1,
             NORMAL_COMPONENT_COUNT, STRIDE
         )
 
@@ -437,9 +450,9 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, NUMBER_END_FAN_VERTICES, NUMBER_END_FAN_VERTICES)
 
         if (triangleMode)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, NUMBER_FAN_VERTICES, NUMBER_SIDE_VERTICES)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, NUMBER_FAN_VERTICES, numberSideVertices)
         else
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, NUMBER_FAN_VERTICES, NUMBER_SIDE_VERTICES)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, NUMBER_FAN_VERTICES, numberSideVertices)
 
         if ( selected && state != State.MOVE ) {
 //            GLES20.glEnable(GLES20.GL_BLEND)
@@ -450,7 +463,7 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
             for (i in 0..5)
                 GLES20.glDrawArrays(
                     GLES20.GL_TRIANGLE_FAN,
-                    NUMBER_FAN_VERTICES + NUMBER_SIDE_VERTICES + NUMBER_HANDLE_VERTICES * i,
+                    NUMBER_FAN_VERTICES + numberSideVertices + NUMBER_HANDLE_VERTICES * i,
                     NUMBER_HANDLE_VERTICES
                 )
 
@@ -491,9 +504,8 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
             }
         }
 
-//        var touchedPoint: Geometry.Point? = Geometry.intersectionPoint(ray, xyRectangle.plane)
         var hitVec4: FloatArray
-        var resultVec4 = FloatArray( 4 )
+        val resultVec4 = FloatArray( 4 )
         var maxZ : Float? = null
         var closestIntersection : CylinderTouch? = null
 
@@ -501,7 +513,6 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
             hitVec4 = floatArrayOf( *intersection.point.asArray(), 1f )
             Matrix.multiplyMV(resultVec4, 0, modelViewMatrix, 0, hitVec4, 0)
             if ( maxZ == null || resultVec4[2] > maxZ ) {
-//                Log.d( TAG, "new max")
                 maxZ = resultVec4[2];
                 closestIntersection = intersection
             }
@@ -511,55 +522,19 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         return closestIntersection
     }
 
-    fun adjustSinglePoint(offset: Geometry.Vector, mesh: Mesh, point : Geometry.Point, previousOffset: Geometry.Vector )
-        : Pair<Geometry.Point, Geometry.Vector>
-    {
-        var newPoint : Geometry.Point?
-        var newOffset = previousOffset
-        if ( mesh.snapToGrid ) {
-
-            // effective location is current point + previousOffset + offset
-            val effectivePoint = point.add( previousOffset ).add ( offset )
-
-            // move to nearest snap point based on effective location
-            newPoint = mesh.nearestSnapPoint( effectivePoint )
-            if ( newPoint == null )
-                Log.w( TAG, "No nearest snap point" )
-
-            // recalc previousOffset = offset from current/new point to effective location
-            newOffset = effectivePoint.subtract( newPoint!! ).asVector()
-        }
-        else {
-            newPoint = point.add( offset )
-        }
-
-        return Pair( newPoint!!, newOffset )
-    }
-
-    fun adjustSnappedPosition(offset: Geometry.Vector, element: CylinderElement, mesh: Mesh) {
-        if ( element == CylinderElement.BODY || element.top() == true) {
-            val ( newTop, newTopOffset) = adjustSinglePoint( offset, mesh, topCenter, previousTopOffset )
-            topCenter = newTop
-            previousTopOffset = newTopOffset
-        }
-        if ( element == CylinderElement.BODY || element.top() != true) {
-            val ( newBottom, newBottomOffset) = adjustSinglePoint( offset, mesh, bottomCenter, previousBottomOffset )
-            bottomCenter = newBottom
-            previousBottomOffset = newBottomOffset
-        }
-
-        generateVertices()
-        vertexArray.updateBuffer(vertexData, 0, NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
-    }
-
-    fun changePosition(topOffset: Geometry.Vector, bottomOffset: Geometry.Vector) {
-        if ( topOffset.length() > 0f )
+    fun changePosition(topOffset: Geometry.Vector?, bottomOffset: Geometry.Vector?) {
+        if ( topOffset !== null && topOffset.length() > 0f )
             topCenter = topCenter.add( topOffset )
-        if ( bottomOffset.length() > 0f )
+        if ( bottomOffset !== null && bottomOffset.length() > 0f )
             bottomCenter = bottomCenter.add( bottomOffset )
 
         generateVertices()
-        vertexArray.updateBuffer(vertexData, 0, NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
+        vertexArray.updateBuffer(vertexData, 0, numberVertices * TOTAL_COMPONENT_COUNT)
+    }
+
+    fun startPositionChange() {
+        previousTopOffset = Geometry.Vector(0f, 0f ,0f)
+        previousBottomOffset = Geometry.Vector(0f, 0f ,0f)
     }
 }
 

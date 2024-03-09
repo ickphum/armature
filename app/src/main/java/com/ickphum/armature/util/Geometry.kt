@@ -104,7 +104,7 @@ class Geometry {
         }
     }
 
-    class Vector(val x: Float, val y: Float, val z: Float) {
+    class Vector(var x: Float, var y: Float, var z: Float) {
 
         constructor( data: FloatArray, offset: Int ) : this( data[ offset], data[ offset + 1], data[ offset + 2 ])
         constructor( point: Point ) : this( point.x, point.y, point.z )
@@ -155,6 +155,14 @@ class Geometry {
             )
         }
 
+        fun add(vector: Vector): Vector {
+            return Vector (
+                x + vector.x,
+                y + vector.y,
+                z + vector.z
+            )
+        }
+
         override fun toString(): String {
             return "Vector(x=$x, y=$y, z=$z)"
         }
@@ -163,6 +171,11 @@ class Geometry {
             return floatArrayOf( x, y, z )
         }
 
+        fun fromVec3( vec3: Vec3 ) {
+            x = vec3.x
+            y = vec3.y
+            z = vec3.z
+        }
 
     }
     class Ray(val point: Point, val vector: Vector) {
@@ -205,6 +218,7 @@ class Geometry {
         fun writeToArray(data: FloatArray, offset: Int) {
             // we're assuming flat shading, so all vertices have the same normal
             val n = normal()
+//            Log.d( "Triangle", "normal $n" )
 
             data[ offset ] = p1.x
             data[ offset + 1] = p1.y
