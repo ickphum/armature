@@ -103,7 +103,7 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         fun resetIndex(index : Int ) = run { classIndex = index }
     }
 
-    var index = Cylinder.nextIndex()
+    var id = Cylinder.nextIndex()
 
     private var previousBottomOffset = Geometry.Vector( 0f, 0f, 0f )
     private var previousTopOffset = Geometry.Vector( 0f, 0f, 0f )
@@ -144,11 +144,14 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         val element: CylinderElement
     )
 
-    override fun toString() = "Cylinder $index"
+    override fun toString() = "Cylinder $id"
 
     private var handlePlanes = listOf<HandlePlane>()
 
     var selected = true
+
+    var topNode : Int? = null
+    var bottomNode : Int? = null
 
     init {
         generateVertices()
@@ -314,14 +317,10 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         val mainAxis = axis.axis()
         val otherAxes = axis.otherAxes()
 
-        //        Log.d( TAG, "axis $mainAxis, otherAxes[0] ${otherAxes[0]}, otherAxes[1] ${otherAxes[1]}")
-
         // centre of triangle fan
         vertexData[offset++] = center.x
         vertexData[offset++] = center.y
         vertexData[offset++] = center.z
-
-//        Log.d( TAG, "center fan ${vertexData[initialOffset + 0]}, ${vertexData[initialOffset + 1]}, ${vertexData[initialOffset + 2]}")
 
         // normal array is init to 0, just set the main axis for the center normal
         normalArray[ mainAxis ] = if ( initialOffset == 0 ) -1f else 1f // such a hack...
@@ -329,20 +328,14 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         vertexData[offset++] = normalArray[ 1 ]
         vertexData[offset++] = normalArray[ 2 ]
 
-//        Log.d( TAG, "normal array ${normalArray[ 0 ]}, ${normalArray[ 1 ]}, ${normalArray[ 2 ]}")
-//        Log.d( TAG, "center normal ${vertexData[initialOffset + 3]}, ${vertexData[initialOffset + 4]}, ${vertexData[initialOffset + 5]}")
-
         for (i in 0..segments) {
             val angleInRadians = (i.toFloat() / segments.toFloat() * (Math.PI.toFloat() * 2f))
-
-//            Log.d( TAG, "i $i, angleInRadians $angleInRadians")
 
             // generate the point as a float array using the axis; the main axis will always match
             // center, the other 2 axes will differ as cos and sin
             pointArray[ mainAxis ] = vertexData[ initialOffset + mainAxis ]
             pointArray[ otherAxes[0] ] = vertexData[ initialOffset + otherAxes[0] ] + radius * cos( angleInRadians )
             pointArray[ otherAxes[1] ] = vertexData[ initialOffset + otherAxes[1] ] + radius * sin( angleInRadians )
-//            Log.d( TAG, "normal array ${pointArray[ 0 ]}, ${pointArray[ 1 ]}, ${pointArray[ 2 ]}")
 
             // add the point in xyz order, which is required of us by OpenGL (by default)
             vertexData[offset++] = pointArray[ 0 ]
@@ -439,6 +432,10 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
 
     fun draw(program: CylinderShaderProgram, state : State, preDragState: State) {
 
+        // draw bottom end blue so we can tell if a cylinder is upside down
+        program.setColorUniform( floatArrayOf( 0f, 0f, 1f, 1f))
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, NUMBER_END_FAN_VERTICES)
+
         program.setColorUniform(if (selected)
             if ( state == State.GROUP || ( state == State.PANNING && preDragState == State.GROUP ))
                 groupColor
@@ -446,7 +443,6 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
                 singleColor
         else normalColor)
 
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, NUMBER_END_FAN_VERTICES)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, NUMBER_END_FAN_VERTICES, NUMBER_END_FAN_VERTICES)
 
         if (triangleMode)
@@ -454,13 +450,15 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         else
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, NUMBER_FAN_VERTICES, numberSideVertices)
 
-        if ( selected && state != State.MOVE ) {
-//            GLES20.glEnable(GLES20.GL_BLEND)
-//            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE)
+        if ( selected && state != State.MOVE && ( topNode == null || bottomNode == null ) ) {
 
             program.setColorUniform(handleColor)
 
-            for (i in 0..5)
+            // bottom handle is drawn first
+            val firstHandle = if ( bottomNode == null ) 0 else 3
+            val lastHandle = if ( topNode == null ) 5 else 2
+
+            for (i in firstHandle..lastHandle)
                 GLES20.glDrawArrays(
                     GLES20.GL_TRIANGLE_FAN,
                     NUMBER_FAN_VERTICES + numberSideVertices + NUMBER_HANDLE_VERTICES * i,
@@ -497,7 +495,6 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
                 if (point != null) {
                     val vectorToCenter = vectorBetween(point, handlePlane.center)
                     if (vectorToCenter.length() < handleRadius) {
-//                    Log.d(TAG, "Touched handle ${handlePlane.element}")
                         intersections.add(CylinderTouch(this, point, handlePlane.element))
                     }
                 }
@@ -535,6 +532,13 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
     fun startPositionChange() {
         previousTopOffset = Geometry.Vector(0f, 0f ,0f)
         previousBottomOffset = Geometry.Vector(0f, 0f ,0f)
+    }
+
+    fun setNode(node: Node, fromTop: Boolean) {
+        if ( fromTop )
+            topNode = node.id
+        else
+            bottomNode = node.id
     }
 }
 

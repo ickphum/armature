@@ -46,6 +46,7 @@ import com.ickphum.armature.objects.Cylinder
 import com.ickphum.armature.objects.Icosahedron
 import com.ickphum.armature.objects.Line
 import com.ickphum.armature.objects.Mesh
+import com.ickphum.armature.objects.Node
 import com.ickphum.armature.objects.Skybox
 import com.ickphum.armature.programs.CylinderShaderProgram
 import com.ickphum.armature.programs.LineShaderProgram
@@ -79,6 +80,12 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     enum class Congruency {
+        EXISTING_NODE {
+            override fun meshRequired() = false
+            override fun lineRequired() = false
+            override fun axis() = Axis.NONE
+            override fun score() = 4
+        },
         SAME_POINT {
             override fun meshRequired() = false
             override fun lineRequired() = false
@@ -187,26 +194,21 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     private var state = State.SELECT
     private var preDragState = State.SELECT
 
-    data class CongruentPoint(val point: Geometry.Point, val congruency : Congruency ) {
+    data class CongruentPoint(val point: Geometry.Point, val congruency : Congruency, val from: Int, val fromTop: Boolean, val to: Int, val toTop: Boolean ) {
         var mesh : Mesh? = null
         var line : Line? = null
         var icosahedron: Icosahedron? = null
         init {
             if ( congruency.meshRequired() )
                 mesh = Mesh( BASE_SIZE / 2f, congruency.axis(), point.asArray()[ congruency.axis().axis() ] )
-            if ( congruency.lineRequired() ) {
-                Log.d( TAG,"create CP mesh ${congruency.meshRequired()}, line ${congruency.lineRequired()}" )
+            if ( congruency.lineRequired() )
                 line = Line(BASE_SIZE / 2f, congruency.axis(), point)
-            }
             if ( congruency === Congruency.SAME_POINT )
-                icosahedron = Icosahedron( NODE_RADIUS, point.asVector() )
+                icosahedron = Icosahedron( point.asVector(), NODE_RADIUS )
         }
     }
     private val congruencies = mutableListOf<CongruentPoint>()
 
-    data class Node( val point: Geometry.Point, val items: List<Cylinder> ) {
-        val icosahedron = Icosahedron( NODE_RADIUS, point.asVector() )
-    }
     private val nodes = mutableListOf<Node>()
 
     // private var testIco : Icosahedron? = null
@@ -308,8 +310,6 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         val xFactor = ( xRotMod360.coerceAtLeast(360f - xRotMod360) - 270f ) / 90f
         val zFactor = ( zRotMod360.coerceAtLeast(360f - zRotMod360) - 270f ) / 90f;
-
-//        Log.d( TAG, "xRotMod360 $xRotMod360, xFactor $xFactor   zRotMod360 $zRotMod360, zFactor $zFactor")
 
         rotateM(viewMatrix, 0, yRotation, xFactor, 0f, zFactor )
 
@@ -414,11 +414,15 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             cyl.draw(cylinderProgram, state, preDragState)
         }
 
+        for ( node in nodes ) {
+            node.draw( cylinderProgram )
+        }
+
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE)
         for (congruency in congruencies.filter { c -> c.icosahedron != null } ) {
             congruency.icosahedron!!.bindData()
-            congruency.icosahedron!!.draw( cylinderProgram )
+            congruency.icosahedron!!.draw( cylinderProgram, floatArrayOf(0.5f, 0.1f, 0.5f, 1f) )
         }
         glDisable(GL_BLEND)
     }
@@ -471,6 +475,10 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
+    private fun getCylinderById( id: Int) : Cylinder = cylinders.first { c -> c.id == id }
+
+    private fun getNodeById( id: Int) : Node = nodes.first { n -> n.id == id }
+
     fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
         val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
 
@@ -482,16 +490,12 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             val cylinderHit = cyl.findIntersectionPoint( ray, modelViewMatrix )
             if ( cylinderHit != null ) {
 
-//                Log.d( TAG, "Cylinder hit on ${cylinderHit.element}")
-
                 // ok, basically I saw a post that said "to find the closest vertex, just apply the modelView transform and
                 // then look at the Z values, highest is closest." Seems to work.
                 hitVec4 = floatArrayOf( *cylinderHit.point.asArray(), 1f )
                 multiplyMV( resultVec4, 0, modelViewMatrix, 0, hitVec4, 0 )
-//                Log.d( TAG, "Cylinder ${cyl.center.x} hit $cylinderHit -> ${resultVec4[0]},${resultVec4[1]},${resultVec4[2]},${resultVec4[3]}")
                 if ( maxZ == null || resultVec4[2] > maxZ ) {
                     // new min Z ie closest hit
-//                    Log.d( TAG, "new min")
                     maxZ = resultVec4[2];
                     touchedObject = TouchedObject( TouchableObjectType.CYLINDER, cylinderHit, null )
                 }
@@ -500,11 +504,13 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         if ( touchedObject != null ) {
             previousTouch = PreviousTouch.ITEM
 
-            // if we touched a handle, switch to the correct plane
             if ( touchedObject!!.type == TouchableObjectType.CYLINDER ) {
+
+                // if we touched a handle, switch to the correct plane
                 val axis = touchedObject!!.touchedCylinder!!.element.axis()
                 if ( axis != null )
                     nextPlane = axis
+
                 previousMeshPoint = touchedObject!!.touchedCylinder!!.point
                 mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, previousMeshPoint!!.asArray()[ nextPlane!!.axis() ] )
 
@@ -528,7 +534,6 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     fun handleShortPress( normalizedX: Float, normalizedY: Float) {
-//        Log.d( TAG, "Short press at $normalizedX $normalizedY")
 
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.SINGLE ) {
@@ -537,20 +542,16 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
                     // note that touching a handle will immediately reset nextPlane as required
                     nextPlane = nextPlane!!.nextAxis()
-                    Log.d( TAG, "Touch 1 on selected cylinder, cycle plane to $nextPlane")
 
                 }
                 else {
-//                    Log.d( TAG, "Touch on new cylinder; ignore or switch?")
                     selectedCyl!!.selected = false
                     touchedObject!!.touchedCylinder!!.cylinder.selected = true
                 }
             }
             else if ( state == State.GROUP ) {
-                if ( touchedObject!!.touchedCylinder!!.cylinder.selected ) {
+                if ( touchedObject!!.touchedCylinder!!.cylinder.selected )
                     nextPlane = nextPlane!!.nextAxis()
-//                    Log.d( TAG, "Touch on selected group cylinder, cycle plane to $nextPlane")
-                }
                 else
                     touchedObject!!.touchedCylinder!!.cylinder.selected = true
             }
@@ -558,6 +559,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                 touchedObject!!.touchedCylinder!!.cylinder.selected = true
                 state = State.SINGLE
             }
+            mesh = null
         }
         else if ( previousTouch == PreviousTouch.NOTHING ) {
             clearCylinderSelections()
@@ -567,20 +569,27 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     fun handleDragStart() {
 
-        //  Log.d( TAG, "Touch at $normalizedX $normalizedY, ray $ray, base point $basePoint")
         preDragState = state
 
         if ( touchedObject?.type == TouchableObjectType.CYLINDER && touchedObject!!.touchedCylinder!!.cylinder.selected
             && ( state == State.SINGLE || state == State.GROUP ) )
         {
-            state = State.MOVE
-//            previousMeshPoint = touchedObject!!.touchedCylinder!!.point
-            touchedObject!!.touchedCylinder!!.cylinder.startPositionChange()
-//            mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, previousMeshPoint!!.asArray()[ nextPlane!!.axis() ] )
-            snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )
-            prevHandleOffset = Geometry.Vector(0f, 0f ,0f)
+            val cylinder = touchedObject!!.touchedCylinder!!.cylinder
+            val element = touchedObject!!.touchedCylinder!!.element
+            // before we start a move, we have to check the selected cylinder(s) for nodes;
+            // any cylinder joined to a node prevents that end of the cylinder being moved.
+            val topNodes = cylinders.any { c -> c.selected && c.topNode != null }
+            val bottomNodes = cylinders.any { c -> c.selected && c.bottomNode != null }
+            if ( (!topNodes || !element.top() ) && ( !bottomNodes || !element.bottom() ) )
+            {
+                state = State.MOVE
+                cylinder.startPositionChange()
+                snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )
+                prevHandleOffset = Geometry.Vector(0f, 0f ,0f)
+            }
+            else
+                Log.d( TAG, "No move, locked cylinder(s) selected")
 
-            Log.d( TAG, "Start move 1 on $nextPlane from $snapHandle, cylinder ${touchedObject!!.touchedCylinder!!.cylinder}")
         }
         else if ( touchedObject?.type == TouchableObjectType.BASE && state == State.SELECT ) {
 
@@ -636,7 +645,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         // create a temp class for this as creating instances of CongruentPoint invokes the
         // 3D object init for the type of congruency
-        data class TempCongruentPoint (val point : Geometry.Point, val congruency: Congruency )
+        data class TempCongruentPoint (val point : Geometry.Point, var congruency: Congruency, val fromTop: Boolean, val toTop: Boolean )
         val newCongruencies = mutableListOf<TempCongruentPoint>()
 
         // check cylinder.top vs other.bottom for any other cylinder,
@@ -650,25 +659,23 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             // Since we're going to check the list of new congruencies for duplicates against
             // existing congruencies anyway, there's no point in checking they're not NONE
             // at this point
-            newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.bottomCenter) ) )
+            newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.bottomCenter), true, false ) )
             if (!other.selected)
-                newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.topCenter) ) )
+                newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.topCenter),  true, true ) )
         }
 
         // ditto for bottom
         if ( element.bottom() )
         {
-            newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.topCenter) ) )
+            newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.topCenter), false, true ) )
             if (!other.selected)
-                newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.bottomCenter) ) )
+                newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.bottomCenter), false, false ) )
         }
-
 
         // we now have either 1, 2 or 4 potential new congruencies; filter out NONEs
         // and check the others against the existing list
         for ( newC in newCongruencies.filter { nc -> nc.congruency != Congruency.NONE } )
         {
-//            Log.d( TAG, "Check real congruency ${newC.congruency}")
             // @todo
             //  doesn't work for group moves with full group checking; have to check the relevant parts of the point
             // as well; two separate cylinders can both have XY matches, for example.
@@ -688,12 +695,33 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             //                // the verticals.
             //            }
 
-            if ( newC.congruency === Congruency.SAME_POINT )
+//            if ( newC.congruency === Congruency.SAME_POINT )
+//            {
+//                // check for existing nodes at the same point
+//
+//                // if we assume that all nodes begin with 2 points, since you can't move two
+//                // ends onto the same point, there's a 50:50 chance that this congruency has
+//                // already been added, by the other point. Check for that congruency.
+//                // (Note that it's quite possible to have several nodes added in one move,
+//                // if you move a group.)
+//                if ( congruencies.firstOrNull { cp -> cp.congruency == Congruency.SAME_POINT && newC.from == cp.to } == null )
+//                {
+//
+//                }
+//            }
+//            else if ( congruencies.firstOrNull { cp -> cp.congruency == newC.congruency } == null )
+
+            // if we've moved onto a point, check if that point is part of a node
+            var otherId = other.id
+            if ( newC.congruency === Congruency.SAME_POINT && ( ( newC.toTop && other.topNode != null ) || ( !newC.toTop && other.bottomNode != null )) )
             {
-                // check for existing nodes at the same point, whether just created or existing
+                // change the congruency type and assign the node id as the target
+                newC.congruency = Congruency.EXISTING_NODE
+                otherId = if ( newC.toTop ) other.topNode!! else other.bottomNode!!
+                getNodeById( otherId ).highlighted = true
             }
-            else if ( congruencies.firstOrNull { cp -> cp.congruency == newC.congruency } == null )
-                congruencies.add( CongruentPoint( newC.point, newC.congruency ) )
+
+            congruencies.add( CongruentPoint( newC.point, newC.congruency, cylinder.id, newC.fromTop, otherId, newC.toTop )  )
         }
 
     }
@@ -735,10 +763,9 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
                 // check for congruencies, ie shared points/lines/planes
                 congruencies.clear()
+                for (node in nodes)
+                    node.highlighted = false
                 for (cylinder in cylinders.filter { c -> c.selected } ) {
-
-//                    if ( cylinder == activeCylinder ) Log.d( TAG, "Moving active cylinder")
-//                    if ( cylinder != activeCylinder ) Log.d( TAG, "Moving group cylinder")
 
                     // check against all other cylinders
                     for (other in cylinders.filter { o -> o !== cylinder } ) {
@@ -754,18 +781,29 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     fun handleDragEnd(normalizedX: Float, normalizedY: Float) {
-//        Log.d( TAG, "Drag end at $normalizedX $normalizedY")
 
         mesh = null
         state = preDragState
+        for ( point in congruencies.filter { it.congruency == Congruency.EXISTING_NODE } ) {
+            val node = getNodeById( point.to )
+            node.addCylinder( point.from )
+            getCylinderById( point.from ).setNode( node, point.fromTop)
+            Log.d( TAG, "Join to node $node from ${point.from}/${point.fromTop} to Node ${point.to} ")
+        }
         for ( point in congruencies.filter { it.congruency == Congruency.SAME_POINT } ) {
-//            nodes.add( No)
+            val node = Node( point.point, NODE_RADIUS, point.from, point.to )
+            nodes.add( node )
+            getCylinderById( point.from ).setNode( node, point.fromTop)
+            getCylinderById( point.to ).setNode( node, point.toTop)
+            Log.d( TAG, "Create node $node from ${point.from}/${point.fromTop} to ${point.to}/${point.toTop} ")
         }
         congruencies.clear()
+        for (node in nodes)
+            node.highlighted = false
+
     }
 
     fun handleLongPress() {
-//        Log.d( TAG, "Long press")
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.GROUP && touchedObject!!.touchedCylinder!!.cylinder.selected ) {
                 touchedObject!!.touchedCylinder!!.cylinder.selected = false
@@ -777,6 +815,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                 touchedObject!!.touchedCylinder!!.cylinder.selected = true
                 state = State.GROUP
             }
+            mesh = null
         }
     }
 

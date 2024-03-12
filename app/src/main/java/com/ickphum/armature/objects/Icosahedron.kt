@@ -11,7 +11,7 @@ import kotlin.math.atan
 import kotlin.math.cos
 import kotlin.math.sin
 
-class Icosahedron (private val radius : Float, private val center: Geometry.Vector ) {
+class Icosahedron (private val center: Geometry.Vector, private val radius : Float ) {
 
     data class IcosahedronTouch(
         val cylinder: Icosahedron,
@@ -34,11 +34,6 @@ class Icosahedron (private val radius : Float, private val center: Geometry.Vect
     private val NUMBER_VERTICES = 20 * 3
 
     private val vertexData = FloatArray(NUMBER_VERTICES * Icosahedron.TOTAL_COMPONENT_COUNT)
-
-    private val singleColor = floatArrayOf(0.7f, 0.7f, 0.2f, 1f)
-    private val groupColor = floatArrayOf(0.97f, 0.53f, 0.08f, 1f)
-    private val normalColor = floatArrayOf(0.5f, 0.1f, 0.1f, 1f)
-    private val handleColor = floatArrayOf(0.1f, 0.5f, 0.5f, 1f)
 
     private lateinit var vertexArray: VertexArray
 //    private lateinit var vertexBuffer: VertexBuffer
@@ -103,7 +98,6 @@ class Icosahedron (private val radius : Float, private val center: Geometry.Vect
         val bottom = Geometry.Vector(0f, 0f, -radius).add( center )
 
         val triangleFloats = 3 * TOTAL_COMPONENT_COUNT
-        Log.d( TAG, "triangleFloats $triangleFloats")
         var offset = 0
 
         for (i in 0 until 5 ) {
@@ -140,8 +134,8 @@ class Icosahedron (private val radius : Float, private val center: Geometry.Vect
         )
     }
 
-    fun draw(cylinderProgram: CylinderShaderProgram) {
-        cylinderProgram.setColorUniform( handleColor )
+    fun draw(cylinderProgram: CylinderShaderProgram, color: FloatArray) {
+        cylinderProgram.setColorUniform( color )
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 20 * 3 )
     }
 }

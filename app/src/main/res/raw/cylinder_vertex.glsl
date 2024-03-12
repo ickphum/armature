@@ -12,7 +12,7 @@ void main()
 
     float diffuse = max(dot(a_Normal, u_VectorToLight), 0.0);
     v_Color *= diffuse;
-    v_Color += 0.4; // ambient
+    v_Color += 0.3; // ambient
     v_Color[3] = u_Color[3];
 
     gl_Position = u_Matrix * vec4(a_Position, 1.0);
