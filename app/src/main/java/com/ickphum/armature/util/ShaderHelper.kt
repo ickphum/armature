@@ -1,7 +1,6 @@
 package com.ickphum.armature.util
 
 import android.content.Context
-import android.content.res.Resources
 import android.opengl.GLES20.GL_COMPILE_STATUS
 import android.opengl.GLES20.GL_FRAGMENT_SHADER
 import android.opengl.GLES20.GL_LINK_STATUS
@@ -16,7 +15,6 @@ import android.opengl.GLES20.glDeleteShader
 import android.opengl.GLES20.glDetachShader
 import android.opengl.GLES20.glGetProgramInfoLog
 import android.opengl.GLES20.glGetProgramiv
-import android.opengl.GLES20.glGetShaderInfoLog
 import android.opengl.GLES20.glGetShaderiv
 import android.opengl.GLES20.glLinkProgram
 import android.opengl.GLES20.glShaderSource
@@ -47,7 +45,7 @@ class ShaderHelper {
 
             val compileStatus = IntArray(1)
             glGetShaderiv(shaderObjectId, GL_COMPILE_STATUS, compileStatus, 0)
-            Log.v(TAG, "Results of compiling source:" + "\n" + sourceResourceId + "\n:" + glGetShaderInfoLog(shaderObjectId));
+//            Log.v(TAG, "Results of compiling source:" + "\n" + sourceResourceId + "\n:" + glGetShaderInfoLog(shaderObjectId));
             if (compileStatus[0] == 0) {
                 // If it failed, delete the shader object.
                 glDeleteShader(shaderObjectId);

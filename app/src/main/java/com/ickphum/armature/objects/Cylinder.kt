@@ -1,7 +1,6 @@
 package com.ickphum.armature.objects
 
 import android.opengl.GLES20
-import android.opengl.Matrix
 import android.util.Log
 import com.ickphum.armature.Constants.BYTES_PER_FLOAT
 import com.ickphum.armature.Constants.NORMAL_COMPONENT_COUNT
@@ -16,8 +15,6 @@ import com.ickphum.armature.util.Geometry.Helper.vectorBetween
 import glm_.glm.angle
 import glm_.glm.angleAxis
 import glm_.vec3.Vec3
-import kotlin.math.cos
-import kotlin.math.sin
 
 class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point, private val radius: Float ) {
 
@@ -103,10 +100,7 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         fun resetIndex(index : Int ) = run { classIndex = index }
     }
 
-    var id = Cylinder.nextIndex()
-
-    private var previousBottomOffset = Geometry.Vector( 0f, 0f, 0f )
-    private var previousTopOffset = Geometry.Vector( 0f, 0f, 0f )
+    var id = nextIndex()
 
     // we draw the cylinder vertically to the height matching the distance between top
     // bottom, then rotate it so that lines up with the actual topCenter
@@ -173,9 +167,9 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         var sideOffset = SIDE_VERTEX_OFFSET
 
         // fill in the bottom fan first so both end fans are calculated before we do the sides
-        addCircleData( vertexData, 0, bottomCenter, radius, SEGMENTS, Axis.Y )
+        Geometry.addCircleData( vertexData, 0, bottomCenter, radius, SEGMENTS, Axis.Y )
 
-        addCircleData( vertexData, offset, verticalCenter, radius, SEGMENTS, Axis.Y )
+        Geometry.addCircleData( vertexData, offset, verticalCenter, radius, SEGMENTS, Axis.Y )
 
         // needed for normal calc
         val centerPoint = Geometry.Point(vertexData, 0)
@@ -254,13 +248,13 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
 
         // add the handle data for all 6 handles
 
-        addCircleData( vertexData, HANDLE_VERTEX_OFFSET, bottomCenter, handleRadius, HANDLE_SEGMENTS, Axis.X )
-        addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT, bottomCenter, handleRadius, HANDLE_SEGMENTS, Axis.Y )
-        addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 2, bottomCenter, handleRadius, HANDLE_SEGMENTS, Axis.Z )
+        Geometry.addCircleData( vertexData, HANDLE_VERTEX_OFFSET, bottomCenter, handleRadius, HANDLE_SEGMENTS, Axis.X )
+        Geometry.addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT, bottomCenter, handleRadius, HANDLE_SEGMENTS, Axis.Y )
+        Geometry.addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 2, bottomCenter, handleRadius, HANDLE_SEGMENTS, Axis.Z )
 
-        addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 3, topCenter, handleRadius, HANDLE_SEGMENTS, Axis.X )
-        addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 4, topCenter, handleRadius, HANDLE_SEGMENTS, Axis.Y )
-        addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 5, topCenter, handleRadius, HANDLE_SEGMENTS, Axis.Z )
+        Geometry.addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 3, topCenter, handleRadius, HANDLE_SEGMENTS, Axis.X )
+        Geometry.addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 4, topCenter, handleRadius, HANDLE_SEGMENTS, Axis.Y )
+        Geometry.addCircleData( vertexData, HANDLE_VERTEX_OFFSET + NUMBER_HANDLE_VERTICES * TOTAL_COMPONENT_COUNT * 5, topCenter, handleRadius, HANDLE_SEGMENTS, Axis.Z )
 
         // create the vertex array
         vertexArray = VertexArray(vertexData)
@@ -299,62 +293,13 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         )
     }
 
-    // this is obviously similar to generateCirclePoint but is capable of generating circles
-    // parallel to any axis, and we don't do anything about the sides. Also, the segment loop
-    // is contained in here rather than the calling environment.
-    private fun addCircleData(
-        vertexData: FloatArray,
-        initialOffset: Int,
-        center: Geometry.Point,
-        radius: Float,
-        segments: Int,
-        axis: Axis
-    )
-    {
-        var offset = initialOffset
-        val pointArray = FloatArray( 3 )
-        val normalArray = floatArrayOf( 0f, 0f, 0f )
-        val mainAxis = axis.axis()
-        val otherAxes = axis.otherAxes()
-
-        // centre of triangle fan
-        vertexData[offset++] = center.x
-        vertexData[offset++] = center.y
-        vertexData[offset++] = center.z
-
-        // normal array is init to 0, just set the main axis for the center normal
-        normalArray[ mainAxis ] = if ( initialOffset == 0 ) -1f else 1f // such a hack...
-        vertexData[offset++] = normalArray[ 0 ]
-        vertexData[offset++] = normalArray[ 1 ]
-        vertexData[offset++] = normalArray[ 2 ]
-
-        for (i in 0..segments) {
-            val angleInRadians = (i.toFloat() / segments.toFloat() * (Math.PI.toFloat() * 2f))
-
-            // generate the point as a float array using the axis; the main axis will always match
-            // center, the other 2 axes will differ as cos and sin
-            pointArray[ mainAxis ] = vertexData[ initialOffset + mainAxis ]
-            pointArray[ otherAxes[0] ] = vertexData[ initialOffset + otherAxes[0] ] + radius * cos( angleInRadians )
-            pointArray[ otherAxes[1] ] = vertexData[ initialOffset + otherAxes[1] ] + radius * sin( angleInRadians )
-
-            // add the point in xyz order, which is required of us by OpenGL (by default)
-            vertexData[offset++] = pointArray[ 0 ]
-            vertexData[offset++] = pointArray[ 1 ]
-            vertexData[offset++] = pointArray[ 2 ]
-
-            // all normals are the same
-            vertexData[offset++] = normalArray[ 0 ]
-            vertexData[offset++] = normalArray[ 1 ]
-            vertexData[offset++] = normalArray[ 2 ]
-        }
-    }
-
     private fun generateStripPoints(
         vertexData: FloatArray,
         offset: Int,
         startSideOffset: Int,
         centerPoint: Geometry.Point
-    ) {
+    )
+    {
 
         // fill in the side strip at the same time; we know the number of points
         // in the top fan, and we just start at the end of those.
@@ -384,7 +329,7 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         // bottom normals (same as top)
         vertexData[sideOffset++] = centerToVertex.x
         vertexData[sideOffset++] = centerToVertex.y
-        vertexData[sideOffset++] = centerToVertex.z
+        vertexData[sideOffset] = centerToVertex.z
 
     }
 
@@ -417,17 +362,8 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
     }
 
     fun bindData() {
-        vertexArray.setVertexAttribPointer(
-            0,
-            0,
-            POSITION_COMPONENT_COUNT, STRIDE
-        )
-        vertexArray.setVertexAttribPointer(
-            POSITION_COMPONENT_COUNT,
-            1,
-            NORMAL_COMPONENT_COUNT, STRIDE
-        )
-
+        vertexArray.setVertexAttribPointer(0,0, POSITION_COMPONENT_COUNT, STRIDE )
+        vertexArray.setVertexAttribPointer( POSITION_COMPONENT_COUNT,1, NORMAL_COMPONENT_COUNT, STRIDE )
     }
 
     fun draw(program: CylinderShaderProgram, state : State, preDragState: State) {
@@ -501,19 +437,15 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
             }
         }
 
-        var hitVec4: FloatArray
-        val resultVec4 = FloatArray( 4 )
         var maxZ : Float? = null
         var closestIntersection : CylinderTouch? = null
 
         for ( intersection in intersections ) {
-            hitVec4 = floatArrayOf( *intersection.point.asArray(), 1f )
-            Matrix.multiplyMV(resultVec4, 0, modelViewMatrix, 0, hitVec4, 0)
-            if ( maxZ == null || resultVec4[2] > maxZ ) {
-                maxZ = resultVec4[2];
+            val newMax = Geometry.compareTouchedPoint( intersection.point, maxZ, modelViewMatrix )
+            if ( newMax != null ) {
+                maxZ = newMax;
                 closestIntersection = intersection
             }
-
         }
 
         return closestIntersection
@@ -529,9 +461,11 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         vertexArray.updateBuffer(vertexData, 0, numberVertices * TOTAL_COMPONENT_COUNT)
     }
 
-    fun startPositionChange() {
-        previousTopOffset = Geometry.Vector(0f, 0f ,0f)
-        previousBottomOffset = Geometry.Vector(0f, 0f ,0f)
+    fun changePositionByNode( offset: Geometry.Vector, nodeId : Int ) {
+        if ( nodeId == topNode )
+            changePosition( offset, null )
+        else
+            changePosition( null, offset )
     }
 
     fun setNode(node: Node, fromTop: Boolean) {

@@ -14,11 +14,13 @@ class Logging {
             }
         }
 
-
         fun dumpArray( tag: String, arr: FloatArray, cols: Int ) {
             val rows = arr.size / cols - 1
             for ( r in 0 .. rows ) {
-                Log.d( tag, "dumpArray: row $r: ${arr[ r * cols ]}, ${arr[ r * cols + 1]}, ${arr[ r * cols + 2]}")
+                var line = "dumpArray: row $r:"
+                for ( c in 0 until cols )
+                    line = "$line ${arr[ r * cols + c ]}"
+                Log.d( tag, line )
             }
 
         }

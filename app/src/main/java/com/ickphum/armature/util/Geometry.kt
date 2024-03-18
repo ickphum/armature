@@ -1,9 +1,13 @@
 package com.ickphum.armature.util
 
+import android.opengl.Matrix
 import com.ickphum.armature.Renderer
+import com.ickphum.armature.enum.Axis
 import glm_.quat.Quat
 import glm_.vec3.Vec3
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 
@@ -85,22 +89,6 @@ class Geometry {
 
         companion object {
             private const val TAG = "Point"
-        }
-    }
-
-    class Circle(val center: Point, val radius: Float) {
-        fun scale(scale: Float): Circle {
-            return Circle(center, radius * scale)
-        }
-
-        override fun toString(): String {
-            return "Circle[ c $center, r $radius ]"
-        }
-    }
-
-    class Cylinder(val center: Point, val radius: Float, val height: Float) {
-        override fun toString(): String {
-            return "Cylinder(center=$center, radius=$radius, height=$height)"
         }
     }
 
@@ -188,7 +176,7 @@ class Geometry {
 
     class Plane(val point: Point, val normal: Vector)
 
-    class Triangle( val p1: Vector, val p2: Vector, val p3: Vector ) {
+    class Triangle(private val p1: Vector, private val p2: Vector, private val p3: Vector ) {
 
         fun normal() : Vector {
             val p1MinusP2 = p1.subtract( p2 )
@@ -298,6 +286,110 @@ class Geometry {
 
         fun intClamp(value: Int, min: Int, max: Int): Int {
             return max.coerceAtMost(value.coerceAtLeast(min))
+        }
+
+        // Generate circles parallel to any axis.
+        fun addCircleData(
+            vertexData: FloatArray,
+            initialOffset: Int,
+            center: Geometry.Point,
+            radius: Float,
+            segments: Int,
+            axis: Axis
+        )
+        {
+            var offset = initialOffset
+            val pointArray = FloatArray( 3 )
+            val normalArray = floatArrayOf( 0f, 0f, 0f )
+            val mainAxis = axis.axis()
+            val otherAxes = axis.otherAxes()
+
+            // centre of triangle fan
+            vertexData[offset++] = center.x
+            vertexData[offset++] = center.y
+            vertexData[offset++] = center.z
+
+            // normal array is init to 0, just set the main axis for the center normal
+            normalArray[ mainAxis ] = if ( initialOffset == 0 ) -1f else 1f // such a hack...
+            vertexData[offset++] = normalArray[ 0 ]
+            vertexData[offset++] = normalArray[ 1 ]
+            vertexData[offset++] = normalArray[ 2 ]
+
+            for (i in 0..segments) {
+                val angleInRadians = (i.toFloat() / segments.toFloat() * (Math.PI.toFloat() * 2f))
+
+                // generate the point as a float array using the axis; the main axis will always match
+                // center, the other 2 axes will differ as cos and sin
+                pointArray[ mainAxis ] = vertexData[ initialOffset + mainAxis ]
+                pointArray[ otherAxes[0] ] = vertexData[ initialOffset + otherAxes[0] ] + radius * cos( angleInRadians )
+                pointArray[ otherAxes[1] ] = vertexData[ initialOffset + otherAxes[1] ] + radius * sin( angleInRadians )
+
+                // add the point in xyz order, which is required of us by OpenGL (by default)
+                vertexData[offset++] = pointArray[ 0 ]
+                vertexData[offset++] = pointArray[ 1 ]
+                vertexData[offset++] = pointArray[ 2 ]
+
+                // all normals are the same
+                vertexData[offset++] = normalArray[ 0 ]
+                vertexData[offset++] = normalArray[ 1 ]
+                vertexData[offset++] = normalArray[ 2 ]
+            }
+        }
+
+        private fun divideByW(vector: FloatArray) {
+            vector[0] /= vector[3]
+            vector[1] /= vector[3]
+            vector[2] /= vector[3]
+        }
+
+        fun convertNormalized2DPointToRay(
+            normalizedX: Float, normalizedY: Float, invertedViewProjectionMatrix : FloatArray
+        ): Geometry.Ray {
+
+            // We'll convert these normalized device coordinates into world-space
+            // coordinates. We'll pick a point on the near and far planes, and draw a
+            // line between them. To do this transform, we need to first multiply by
+            // the inverse matrix, and then we need to undo the perspective divide.
+            val nearPointNdc = floatArrayOf(normalizedX, normalizedY, -1f, 1f)
+            val farPointNdc = floatArrayOf(normalizedX, normalizedY, 1f, 1f)
+            val nearPointWorld = FloatArray(4)
+            val farPointWorld = FloatArray(4)
+            Matrix.multiplyMV(
+                nearPointWorld, 0, invertedViewProjectionMatrix, 0, nearPointNdc, 0
+            )
+            Matrix.multiplyMV(
+                farPointWorld, 0, invertedViewProjectionMatrix, 0, farPointNdc, 0
+            )
+
+            // Why are we dividing by W? We multiplied our vector by an inverse
+            // matrix, so the W value that we end up is actually the *inverse* of
+            // what the projection matrix would create. By dividing all 3 components
+            // by W, we effectively undo the hardware perspective divide.
+            divideByW(nearPointWorld)
+            divideByW(farPointWorld)
+
+            // We don't care about the W value anymore, because our points are now
+            // in world coordinates.
+            val nearPointRay = Point(nearPointWorld[0], nearPointWorld[1], nearPointWorld[2])
+            val farPointRay = Point(farPointWorld[0], farPointWorld[1], farPointWorld[2])
+            return Ray(
+                nearPointRay,
+                vectorBetween(nearPointRay, farPointRay)
+            )
+        }
+
+        fun compareTouchedPoint( point : Geometry.Point, maxZ : Float?, matrix: FloatArray ) : Float? {
+            val resultVec4 = FloatArray( 4 )
+
+            // ok, basically I saw a post that said "to find the closest vertex, just apply the modelView transform and
+            // then look at the Z values, highest is closest." Seems to work.
+            val hitVec4 = floatArrayOf( *point.asArray(), 1f )
+            Matrix.multiplyMV(resultVec4, 0, matrix, 0, hitVec4, 0)
+            if ( maxZ == null || resultVec4[2] > maxZ ) {
+                // new max Z ie closest hit
+                return resultVec4[2]
+            }
+            return null
         }
 
     }

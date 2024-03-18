@@ -31,10 +31,8 @@ import android.opengl.GLES20.glGetString
 import android.opengl.GLES20.glLineWidth
 import android.opengl.GLES20.glViewport
 import android.opengl.GLSurfaceView
-import android.opengl.Matrix
 import android.opengl.Matrix.invertM
 import android.opengl.Matrix.multiplyMM
-import android.opengl.Matrix.multiplyMV
 import android.opengl.Matrix.rotateM
 import android.opengl.Matrix.setIdentityM
 import android.opengl.Matrix.translateM
@@ -43,6 +41,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.objects.Cylinder
+import com.ickphum.armature.objects.Handle
 import com.ickphum.armature.objects.Icosahedron
 import com.ickphum.armature.objects.Line
 import com.ickphum.armature.objects.Mesh
@@ -141,7 +140,11 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         abstract fun score() : Int
     }
 
-    data class TouchedObject(val type: TouchableObjectType, val touchedCylinder: Cylinder.CylinderTouch?, val basePoint: Geometry.Point? )
+    data class TouchedObject(val type: TouchableObjectType, val cylinder: Cylinder.CylinderTouch?, val basePoint: Geometry.Point?, val node: Node.NodeTouch? ) {
+        constructor(type: Renderer.TouchableObjectType, cylinder: Cylinder.CylinderTouch) : this( type, cylinder, null, null )
+        constructor(type: Renderer.TouchableObjectType, basePoint: Geometry.Point) : this( type, null, basePoint, null )
+        constructor(type: Renderer.TouchableObjectType, node: Node.NodeTouch) : this( type, null, null, node )
+    }
 
     private var touchedObject: TouchedObject? = null
 
@@ -211,7 +214,8 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private val nodes = mutableListOf<Node>()
 
-    // private var testIco : Icosahedron? = null
+//     private var testIco : Icosahedron? = null
+    private var testHandle : Handle? = null
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
 
@@ -235,32 +239,11 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         meshProgram = MeshShaderProgram( context )
         base = Mesh( BASE_SIZE / 2f, Axis.Y, 0f )
 
-//        mesh = Mesh( 2.5f, Axis.Z, 0.5f)
-
         cylinderProgram = CylinderShaderProgram( context )
 
         lineProgram = LineShaderProgram( context )
 
-//        val p = Geometry.Point(1f, 0f, 0f)
-//        val v = Vec3( Geometry.Vector( 1f, 0f, 1f).normalize().asArray(), 0 )
-//        val q = angleAxis( PIf, v )
-//        val pr = p.rotate( q )
-//        Log.d( TAG, "p $p -> pr $pr")
-//
-//        val v1 = Vec3( Geometry.Vector( 0f, 1f, 0f).normalize().asArray(), 0 )
-//        val v2 = Vec3( Geometry.Vector( 1f, 1f, 0f).normalize().asArray(), 0 )
-//        val angleR = angle( v1, v2 )
-//        Log.d( TAG, "angle $angleR")
-//
-//        // rotation axis test
-//        val rAxis = Geometry.Vector(0f,1f, 0f).crossProduct( Geometry.Vector( 0f, 2f, 1f))
-//        Log.d( TAG, "rAxis $rAxis")
-
-//        val cylinder = Cylinder(Geometry.Point( 0f, 0f, 0f ), Geometry.Point( 1f, 1f, 0f ), DEFAULT_ITEM_RADIUS )
-//        cylinders.add(cylinder)
-//        state = State.SINGLE
-
-//        testIco = Icosahedron( 0.625f, Geometry.Vector( 1f, 1f, -2f ))
+        Log.d( TAG, "Handle created $testHandle")
     }
 
     override fun onSurfaceChanged(unused: GL10, width: Int, height: Int) {
@@ -415,7 +398,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         }
 
         for ( node in nodes ) {
-            node.draw( cylinderProgram )
+            node.draw( cylinderProgram, state, preDragState )
         }
 
         glEnable(GL_BLEND)
@@ -427,51 +410,12 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         glDisable(GL_BLEND)
     }
 
-    private fun divideByW(vector: FloatArray) {
-        vector[0] /= vector[3]
-        vector[1] /= vector[3]
-        vector[2] /= vector[3]
-    }
-
-    private fun convertNormalized2DPointToRay(
-        normalizedX: Float, normalizedY: Float
-    ): Geometry.Ray {
-
-        // We'll convert these normalized device coordinates into world-space
-        // coordinates. We'll pick a point on the near and far planes, and draw a
-        // line between them. To do this transform, we need to first multiply by
-        // the inverse matrix, and then we need to undo the perspective divide.
-        val nearPointNdc = floatArrayOf(normalizedX, normalizedY, -1f, 1f)
-        val farPointNdc = floatArrayOf(normalizedX, normalizedY, 1f, 1f)
-        val nearPointWorld = FloatArray(4)
-        val farPointWorld = FloatArray(4)
-        Matrix.multiplyMV(
-            nearPointWorld, 0, invertedViewProjectionMatrix, 0, nearPointNdc, 0
-        )
-        Matrix.multiplyMV(
-            farPointWorld, 0, invertedViewProjectionMatrix, 0, farPointNdc, 0
-        )
-
-        // Why are we dividing by W? We multiplied our vector by an inverse
-        // matrix, so the W value that we end up is actually the *inverse* of
-        // what the projection matrix would create. By dividing all 3 components
-        // by W, we effectively undo the hardware perspective divide.
-        divideByW(nearPointWorld)
-        divideByW(farPointWorld)
-
-        // We don't care about the W value anymore, because our points are now
-        // in world coordinates.
-        val nearPointRay = Geometry.Point(nearPointWorld[0], nearPointWorld[1], nearPointWorld[2])
-        val farPointRay = Geometry.Point(farPointWorld[0], farPointWorld[1], farPointWorld[2])
-        return Geometry.Ray(
-            nearPointRay,
-            Geometry.vectorBetween(nearPointRay, farPointRay)
-        )
-    }
-
-    private fun clearCylinderSelections() {
+    private fun clearSelections() {
         for (cyl in cylinders) {
             cyl.selected = false;
+        }
+        for (node in nodes) {
+            node.selected = false;
         }
     }
 
@@ -480,50 +424,68 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     private fun getNodeById( id: Int) : Node = nodes.first { n -> n.id == id }
 
     fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
-        val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+        val ray = Geometry.convertNormalized2DPointToRay(normalizedX, normalizedY, invertedViewProjectionMatrix )
+
+        touchedObject = null
 
         var maxZ : Float? = null
-        touchedObject = null
-        for (cyl in cylinders) {
-            var hitVec4: FloatArray
-            val resultVec4 = FloatArray( 4 )
-            val cylinderHit = cyl.findIntersectionPoint( ray, modelViewMatrix )
-            if ( cylinderHit != null ) {
 
-                // ok, basically I saw a post that said "to find the closest vertex, just apply the modelView transform and
-                // then look at the Z values, highest is closest." Seems to work.
-                hitVec4 = floatArrayOf( *cylinderHit.point.asArray(), 1f )
-                multiplyMV( resultVec4, 0, modelViewMatrix, 0, hitVec4, 0 )
-                if ( maxZ == null || resultVec4[2] > maxZ ) {
-                    // new min Z ie closest hit
-                    maxZ = resultVec4[2];
-                    touchedObject = TouchedObject( TouchableObjectType.CYLINDER, cylinderHit, null )
+        for (node in nodes ) {
+            val nodeHit = node.findIntersectionPoint( ray, modelViewMatrix )
+            if ( nodeHit != null )
+            {
+                val newMax = Geometry.compareTouchedPoint( nodeHit.point, maxZ, modelViewMatrix )
+                if ( newMax !== null ) {
+                    maxZ = newMax
+                    touchedObject = TouchedObject( TouchableObjectType.NODE, nodeHit )
                 }
             }
         }
+
+        for (cyl in cylinders) {
+            val cylinderHit = cyl.findIntersectionPoint( ray, modelViewMatrix )
+            if ( cylinderHit != null ) {
+                val newMax = Geometry.compareTouchedPoint( cylinderHit.point, maxZ, modelViewMatrix )
+                if ( newMax !== null ) {
+                    maxZ = newMax
+                    touchedObject = TouchedObject( TouchableObjectType.CYLINDER, cylinderHit )
+                }
+            }
+        }
+
         if ( touchedObject != null ) {
             previousTouch = PreviousTouch.ITEM
+            var axis: Axis? = null
 
-            if ( touchedObject!!.type == TouchableObjectType.CYLINDER ) {
-
-                // if we touched a handle, switch to the correct plane
-                val axis = touchedObject!!.touchedCylinder!!.element.axis()
-                if ( axis != null )
-                    nextPlane = axis
-
-                previousMeshPoint = touchedObject!!.touchedCylinder!!.point
-                mesh = Mesh( BASE_SIZE / 2f, nextPlane!!, previousMeshPoint!!.asArray()[ nextPlane!!.axis() ] )
-
-                // recalculate the snap points around the touched point
-                mesh!!.findIntersectionPoint( ray )
+            if (touchedObject!!.type == TouchableObjectType.CYLINDER) {
+                axis = touchedObject!!.cylinder!!.element.axis()
+                previousMeshPoint = touchedObject!!.cylinder!!.point
             }
+
+            if (touchedObject!!.type == TouchableObjectType.NODE) {
+                axis = touchedObject!!.node!!.element.axis()
+                previousMeshPoint = touchedObject!!.node!!.point
+            }
+
+            // if we touched a handle, switch to the correct plane
+            if (axis != null)
+                nextPlane = axis
+
+            mesh = Mesh(
+                BASE_SIZE / 2f,
+                nextPlane!!,
+                previousMeshPoint!!.asArray()[nextPlane!!.axis()]
+            )
+
+            // recalculate the snap points around the touched point
+            mesh!!.findIntersectionPoint(ray)
         }
         else {
 
             // basePoint is only set if the touched point was within the base boundary
             val basePoint = base.findIntersectionPoint(ray)
             if ( basePoint != null ) {
-                touchedObject = TouchedObject( TouchableObjectType.BASE, null, basePoint )
+                touchedObject = TouchedObject( TouchableObjectType.BASE, basePoint )
                 previousTouch = PreviousTouch.BASE
             }
             else
@@ -537,32 +499,58 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.SINGLE ) {
-                val selectedCyl = cylinders.find { cylinder -> cylinder.selected  }
-                if ( selectedCyl == touchedObject!!.touchedCylinder!!.cylinder ) {
+                if ( touchedObject!!.type == TouchableObjectType.CYLINDER )
+                {
+                    val selectedCyl = cylinders.find { cylinder -> cylinder.selected  }
+                    if ( selectedCyl == touchedObject!!.cylinder!!.cylinder ) {
 
-                    // note that touching a handle will immediately reset nextPlane as required
-                    nextPlane = nextPlane!!.nextAxis()
+                        // note that touching a handle will immediately reset nextPlane as required
+                        nextPlane = nextPlane!!.nextAxis()
 
+                    }
+                    else {
+                        clearSelections()
+                        touchedObject!!.cylinder!!.cylinder.selected = true
+                    }
                 }
-                else {
-                    selectedCyl!!.selected = false
-                    touchedObject!!.touchedCylinder!!.cylinder.selected = true
+                else if ( touchedObject!!.type == TouchableObjectType.NODE )
+                {
+                    val selectedNode = nodes.find { n -> n.selected  }
+                    Log.d( TAG, "selectedNode $selectedNode")
+                    if ( selectedNode == touchedObject!!.node!!.node ) {
+
+                        // not much point in this since nodes ain't got no body
+                        nextPlane = nextPlane!!.nextAxis()
+
+                    }
+                    else {
+                        clearSelections()
+                        touchedObject!!.node!!.node.selected = true
+                    }
                 }
             }
             else if ( state == State.GROUP ) {
-                if ( touchedObject!!.touchedCylinder!!.cylinder.selected )
-                    nextPlane = nextPlane!!.nextAxis()
-                else
-                    touchedObject!!.touchedCylinder!!.cylinder.selected = true
+                if ( touchedObject!!.type == TouchableObjectType.CYLINDER ) {
+                    if (touchedObject!!.cylinder!!.cylinder.selected)
+                        nextPlane = nextPlane!!.nextAxis()
+                    else
+                        touchedObject!!.cylinder!!.cylinder.selected = true
+                }
             }
             else if ( state == State.SELECT ) {
-                touchedObject!!.touchedCylinder!!.cylinder.selected = true
-                state = State.SINGLE
+                if ( touchedObject!!.type == TouchableObjectType.CYLINDER ) {
+                    touchedObject!!.cylinder!!.cylinder.selected = true
+                    state = State.SINGLE
+                }
+                else if ( touchedObject!!.type == TouchableObjectType.NODE ) {
+                    touchedObject!!.node!!.node.selected = true
+                    state = State.SINGLE
+                }
             }
             mesh = null
         }
         else if ( previousTouch == PreviousTouch.NOTHING ) {
-            clearCylinderSelections()
+            clearSelections()
             state = State.SELECT
         }
     }
@@ -571,11 +559,11 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         preDragState = state
 
-        if ( touchedObject?.type == TouchableObjectType.CYLINDER && touchedObject!!.touchedCylinder!!.cylinder.selected
+        if ( touchedObject?.type == TouchableObjectType.CYLINDER && touchedObject!!.cylinder!!.cylinder.selected
             && ( state == State.SINGLE || state == State.GROUP ) )
         {
-            val cylinder = touchedObject!!.touchedCylinder!!.cylinder
-            val element = touchedObject!!.touchedCylinder!!.element
+            val element = touchedObject!!.cylinder!!.element
+
             // before we start a move, we have to check the selected cylinder(s) for nodes;
             // any cylinder joined to a node prevents that end of the cylinder being moved.
             val topNodes = cylinders.any { c -> c.selected && c.topNode != null }
@@ -583,13 +571,19 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             if ( (!topNodes || !element.top() ) && ( !bottomNodes || !element.bottom() ) )
             {
                 state = State.MOVE
-                cylinder.startPositionChange()
                 snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )
                 prevHandleOffset = Geometry.Vector(0f, 0f ,0f)
             }
             else
                 Log.d( TAG, "No move, locked cylinder(s) selected")
 
+        }
+        else if ( touchedObject?.type == TouchableObjectType.NODE && touchedObject!!.node!!.node.selected
+            && ( state == State.SINGLE || state == State.GROUP ) )
+        {
+            state = State.MOVE
+            snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )
+            prevHandleOffset = Geometry.Vector(0f, 0f ,0f)
         }
         else if ( touchedObject?.type == TouchableObjectType.BASE && state == State.SELECT ) {
 
@@ -610,7 +604,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             previousMeshPoint = snapHandle!!.translateY( 0.01f )
             touchedObject = TouchedObject( TouchableObjectType.CYLINDER,
                 Cylinder.CylinderTouch( cylinder, previousMeshPoint!!, Cylinder.CylinderElement.TOP_Z ),
-                null )
+                )
         }
         else {
             state = State.PANNING
@@ -737,14 +731,13 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                 yRotation = 90f;
             updateViewMatrices()
         }
-        else if ( state == State.MOVE ){
+        else if ( state == State.MOVE )
+        {
 
             // find intersection of current position with current mesh
-            val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+            val ray = Geometry.convertNormalized2DPointToRay(normalizedX, normalizedY, invertedViewProjectionMatrix)
             val meshPoint = mesh!!.findIntersectionPoint(ray)
             if (meshPoint != null) {
-
-                val element = touchedObject!!.touchedCylinder!!.element
 
                 // if we're snapping points, we have to find out how the handle moves,
                 // and then apply the offset to the other cylinders in the group.
@@ -753,28 +746,41 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
                 if ( delta.length() > 0f )
                 {
-                    // apply the offsets to all other selected objects.
-                    for (cylinder in cylinders.filter { cyl -> cyl.selected } ) {
-                        cylinder.changePosition( if (element.top()) delta else null, if (element.bottom()) delta else null )
-                    }
+                    if ( touchedObject!!.type == TouchableObjectType.CYLINDER )
+                    {
+                        val element = touchedObject!!.cylinder!!.element
 
+                        // apply the offsets to all other selected objects.
+                        for (cylinder in cylinders.filter { cyl -> cyl.selected } ) {
+                            cylinder.changePosition( if (element.top()) delta else null, if (element.bottom()) delta else null )
+                        }
+
+                        // check for congruencies, ie shared points/lines/planes
+                        congruencies.clear()
+                        for (node in nodes)
+                            node.highlighted = false
+                        for (cylinder in cylinders.filter { c -> c.selected } ) {
+
+                            // check against all other cylinders
+                            for (other in cylinders.filter { o -> o !== cylinder } ) {
+
+                                // only check the moving end; both ends move when selection == BODY
+                                checkForCongruency( element, cylinder, other )
+
+                            }
+                        }
+                    }
+                    else if ( touchedObject!!.type == TouchableObjectType.NODE )
+                    {
+                        // apply the offsets to all other selected objects.
+                        for (node in nodes.filter { n -> n.selected } ) {
+                            node.changePosition( delta )
+                            for ( id in node.cylinderIds )
+                                getCylinderById( id ).changePositionByNode( delta, node.id )
+                        }
+                    }
                 }
                 snapHandle = newHandle
-
-                // check for congruencies, ie shared points/lines/planes
-                congruencies.clear()
-                for (node in nodes)
-                    node.highlighted = false
-                for (cylinder in cylinders.filter { c -> c.selected } ) {
-
-                    // check against all other cylinders
-                    for (other in cylinders.filter { o -> o !== cylinder } ) {
-
-                        // only check the moving end; both ends move when selection == BODY
-                        checkForCongruency( element, cylinder, other )
-
-                    }
-                }
             }
 
         }
@@ -805,14 +811,14 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     fun handleLongPress() {
         if ( previousTouch == PreviousTouch.ITEM ) {
-            if ( state == State.GROUP && touchedObject!!.touchedCylinder!!.cylinder.selected ) {
-                touchedObject!!.touchedCylinder!!.cylinder.selected = false
+            if ( state == State.GROUP && touchedObject!!.cylinder!!.cylinder.selected ) {
+                touchedObject!!.cylinder!!.cylinder.selected = false
                 val count = cylinders.filter { cyl -> cyl.selected }.size
                 if ( count == 0 )
                     state = State.SELECT
             }
             else if ( state == State.SINGLE || state == State.SELECT || state == State.GROUP ) {
-                touchedObject!!.touchedCylinder!!.cylinder.selected = true
+                touchedObject!!.cylinder!!.cylinder.selected = true
                 state = State.GROUP
             }
             mesh = null
@@ -820,3 +826,20 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
 }
+
+/*
+TODO
+
+Create Item class to combine Cylinder and Node interfaces
+Create Model class to hold cylinders, nodes, etc
+Group selection/handling for Nodes (after Item exists)
+
++ UI changes;
+on screen buttons for undo, settings, save/load etc
+need to be able to undo & redo, leave nodes, delete nodes & cylinders
+save, load, clear models
+automatic joining of group selections
+    For groups > 3, find closest neighbour
+    cylinders - top/top, bottom/bottom, alternating.
+
+ */

@@ -11,7 +11,7 @@ import kotlin.math.atan
 import kotlin.math.cos
 import kotlin.math.sin
 
-class Icosahedron (private val center: Geometry.Vector, private val radius : Float ) {
+class Icosahedron (private var center: Geometry.Vector, private val radius : Float ) {
 
     data class IcosahedronTouch(
         val cylinder: Icosahedron,
@@ -19,10 +19,13 @@ class Icosahedron (private val center: Geometry.Vector, private val radius : Flo
     )
 
     companion object {
+        private val H_ANGLE = PIf / 180f * 72f;    // 72 degree = 360 / 5
+        private val V_ANGLE = atan(1.0f / 2);  // elevation = 26.565 degree
         private const val TOTAL_COMPONENT_COUNT =
             Constants.POSITION_COMPONENT_COUNT + Constants.NORMAL_COMPONENT_COUNT
         private const val STRIDE = TOTAL_COMPONENT_COUNT * Constants.BYTES_PER_FLOAT
         private const val TAG = "Icosahedron"
+        private const val NUMBER_VERTICES = 20 * 3
     }
 
     private var previousBottomOffset = Geometry.Vector( 0f, 0f, 0f )
@@ -31,13 +34,10 @@ class Icosahedron (private val center: Geometry.Vector, private val radius : Flo
     private val handleRadius = radius * 3f
 
     // 20 triangular sides
-    private val NUMBER_VERTICES = 20 * 3
 
     private val vertexData = FloatArray(NUMBER_VERTICES * Icosahedron.TOTAL_COMPONENT_COUNT)
 
     private lateinit var vertexArray: VertexArray
-//    private lateinit var vertexBuffer: VertexBuffer
-//    private lateinit var indexBuffer: IndexBuffer
 
     data class HandlePlane(
         val plane: Geometry.Plane,
@@ -61,8 +61,7 @@ class Icosahedron (private val center: Geometry.Vector, private val radius : Flo
 
     private fun generateVertices() {
         // constants
-        val H_ANGLE = PIf / 180f * 72f;    // 72 degree = 360 / 5
-        val V_ANGLE = atan(1.0f / 2);  // elevation = 26.565 degree
+
 
         var hAngle1 = -PIf / 2 - H_ANGLE / 2;  // start from -126 deg at 1st row
         var hAngle2 = -PIf / 2;                // start from -90 deg at 2nd row
@@ -74,8 +73,8 @@ class Icosahedron (private val center: Geometry.Vector, private val radius : Flo
         // compute 10 vertexData at 1st and 2nd rows
         for( i in 0 .. 4 )
         {
-            val z = radius * sin(V_ANGLE);            // elevaton
-            val xy = radius * cos(V_ANGLE);            // length on XY plane
+            val z = radius * sin(V_ANGLE);              // elevation
+            val xy = radius * cos(V_ANGLE);             // length on XY plane
 
             topRow.add( Geometry.Vector(
                 xy * cos(hAngle1),
@@ -138,4 +137,11 @@ class Icosahedron (private val center: Geometry.Vector, private val radius : Flo
         cylinderProgram.setColorUniform( color )
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 20 * 3 )
     }
+
+    fun changePosition(delta: Geometry.Vector) {
+        center = center.add( delta )
+        generateVertices()
+        vertexArray.updateBuffer(vertexData, 0, NUMBER_VERTICES * TOTAL_COMPONENT_COUNT)
+    }
+
 }
