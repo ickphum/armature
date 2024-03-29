@@ -16,55 +16,7 @@ import glm_.glm.angle
 import glm_.glm.angleAxis
 import glm_.vec3.Vec3
 
-class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point, private val radius: Float ) {
-
-    enum class CylinderElement {
-        BODY {
-            override fun axis() = null
-            override fun top() = true
-            override fun bottom() = true
-        },
-        BOTTOM_X {
-            override fun axis() = Axis.X
-            override fun top() = false
-            override fun bottom() = true
-        },
-        BOTTOM_Y {
-            override fun axis() = Axis.Y
-            override fun top() = false
-            override fun bottom() = true
-        },
-        BOTTOM_Z {
-            override fun axis() = Axis.Z
-            override fun top() = false
-            override fun bottom() = true
-        },
-        TOP_X {
-            override fun axis() = Axis.X
-            override fun top() = true
-            override fun bottom() = false
-        },
-        TOP_Y {
-            override fun axis() = Axis.Y
-            override fun top() = true
-            override fun bottom() = false
-        },
-        TOP_Z {
-            override fun axis() = Axis.Z
-            override fun top() = true
-            override fun bottom() = false
-        };
-
-        abstract fun axis(): Axis?
-        abstract fun top(): Boolean
-        abstract fun bottom(): Boolean
-    }
-
-    data class CylinderTouch(
-        val cylinder: Cylinder,
-        val point: Geometry.Point,
-        val element: CylinderElement
-    )
+class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point, private val radius: Float ) : Item() {
 
     companion object {
         private const val TOTAL_COMPONENT_COUNT = POSITION_COMPONENT_COUNT + NORMAL_COMPONENT_COUNT
@@ -95,12 +47,12 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         private const val HANDLE_SEGMENTS = 24
         private const val NUMBER_HANDLE_VERTICES = HANDLE_SEGMENTS + 2
 
-        private var classIndex = 0
-        fun nextIndex() = classIndex++
-        fun resetIndex(index : Int ) = run { classIndex = index }
+//        private var classIndex = 0
+//        fun nextIndex() = classIndex++
+//        fun resetIndex(index : Int ) = run { classIndex = index }
     }
 
-    var id = nextIndex()
+//    var id = nextIndex()
 
     // we draw the cylinder vertically to the height matching the distance between top
     // bottom, then rotate it so that lines up with the actual topCenter
@@ -135,20 +87,19 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
     data class HandlePlane(
         val plane: Geometry.Plane,
         val center: Geometry.Point,
-        val element: CylinderElement
+        val element: ItemElement
     )
 
     override fun toString() = "Cylinder $id"
 
     private var handlePlanes = listOf<HandlePlane>()
 
-    var selected = true
-
     var topNode : Int? = null
     var bottomNode : Int? = null
 
     init {
         generateVertices()
+        Log.d(TAG, "Create cylinder $id")
     }
 
     private fun dumpArrayTriplets(array: FloatArray, offset: Int, stride: Int, count: Int, label: String )
@@ -284,12 +235,12 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         topCenterZPlane = Geometry.Plane( topCenter, Geometry.Vector(0f, 0f, 1f ))
 
         handlePlanes = listOf(
-            HandlePlane(centerXPlane, bottomCenter, CylinderElement.BOTTOM_X),
-            HandlePlane(centerYPlane, bottomCenter, CylinderElement.BOTTOM_Y),
-            HandlePlane(centerZPlane, bottomCenter, CylinderElement.BOTTOM_Z),
-            HandlePlane(topCenterXPlane, topCenter, CylinderElement.TOP_X),
-            HandlePlane(topCenterYPlane, topCenter, CylinderElement.TOP_Y),
-            HandlePlane(topCenterZPlane, topCenter, CylinderElement.TOP_Z),
+            HandlePlane(centerXPlane, bottomCenter, ItemElement.BOTTOM_X),
+            HandlePlane(centerYPlane, bottomCenter, ItemElement.BOTTOM_Y),
+            HandlePlane(centerZPlane, bottomCenter, ItemElement.BOTTOM_Z),
+            HandlePlane(topCenterXPlane, topCenter, ItemElement.TOP_X),
+            HandlePlane(topCenterYPlane, topCenter, ItemElement.TOP_Y),
+            HandlePlane(topCenterZPlane, topCenter, ItemElement.TOP_Z),
         )
     }
 
@@ -366,7 +317,9 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         vertexArray.setVertexAttribPointer( POSITION_COMPONENT_COUNT,1, NORMAL_COMPONENT_COUNT, STRIDE )
     }
 
-    fun draw(program: CylinderShaderProgram, state : State, preDragState: State) {
+    override fun canMove() = true
+
+    override fun draw(program: CylinderShaderProgram, state : State, preDragState: State) {
 
         // draw bottom end blue so we can tell if a cylinder is upside down
         program.setColorUniform( floatArrayOf( 0f, 0f, 1f, 1f))
@@ -406,22 +359,22 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
 
     }
 
-    fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): CylinderTouch? {
+    fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch? {
 
-        val intersections = mutableListOf<CylinderTouch>()
+        val intersections = mutableListOf<ItemTouch>()
 
         // we can register a touch to any visible handle or to the cylinder; closest point takes preference.
         var touchedPoint: Geometry.Point? = Geometry.intersectionPoint(ray, xyRectangle.plane)
         if ( touchedPoint != null )
         {
             if ( xyRectangle.topTriangle.pointInTriangle( touchedPoint ) || xyRectangle.bottomTriangle.pointInTriangle( touchedPoint ))
-                intersections.add( CylinderTouch( this, touchedPoint, CylinderElement.BODY ) )
+                intersections.add( ItemTouch( this, touchedPoint, ItemElement.BODY ) )
         }
         touchedPoint = Geometry.intersectionPoint(ray, zyRectangle.plane)
         if ( touchedPoint != null )
         {
             if ( zyRectangle.topTriangle.pointInTriangle( touchedPoint ) || zyRectangle.bottomTriangle.pointInTriangle( touchedPoint ))
-                intersections.add( CylinderTouch( this, touchedPoint, CylinderElement.BODY ) )
+                intersections.add( ItemTouch( this, touchedPoint, ItemElement.BODY ) )
         }
 
         if ( selected ) {
@@ -431,14 +384,14 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
                 if (point != null) {
                     val vectorToCenter = vectorBetween(point, handlePlane.center)
                     if (vectorToCenter.length() < handleRadius) {
-                        intersections.add(CylinderTouch(this, point, handlePlane.element))
+                        intersections.add(ItemTouch(this, point, handlePlane.element))
                     }
                 }
             }
         }
 
         var maxZ : Float? = null
-        var closestIntersection : CylinderTouch? = null
+        var closestIntersection : ItemTouch? = null
 
         for ( intersection in intersections ) {
             val newMax = Geometry.compareTouchedPoint( intersection.point, maxZ, modelViewMatrix )

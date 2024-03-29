@@ -43,6 +43,7 @@ import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.objects.Cylinder
 import com.ickphum.armature.objects.Handle
 import com.ickphum.armature.objects.Icosahedron
+import com.ickphum.armature.objects.Item
 import com.ickphum.armature.objects.Line
 import com.ickphum.armature.objects.Mesh
 import com.ickphum.armature.objects.Node
@@ -140,10 +141,9 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         abstract fun score() : Int
     }
 
-    data class TouchedObject(val type: TouchableObjectType, val cylinder: Cylinder.CylinderTouch?, val basePoint: Geometry.Point?, val node: Node.NodeTouch? ) {
-        constructor(type: Renderer.TouchableObjectType, cylinder: Cylinder.CylinderTouch) : this( type, cylinder, null, null )
-        constructor(type: Renderer.TouchableObjectType, basePoint: Geometry.Point) : this( type, null, basePoint, null )
-        constructor(type: Renderer.TouchableObjectType, node: Node.NodeTouch) : this( type, null, null, node )
+    data class TouchedObject(val type: TouchableObjectType, val itemTouch: Item.ItemTouch?, val basePoint: Geometry.Point? ) {
+        constructor(type: Renderer.TouchableObjectType, item: Item.ItemTouch) : this( type, item, null )
+        constructor(type: Renderer.TouchableObjectType, basePoint: Geometry.Point) : this( type, null, basePoint )
     }
 
     private var touchedObject: TouchedObject? = null
@@ -179,7 +179,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     private var nextPlane: Axis? = null
 
     enum class PreviousTouch {
-        NOTHING, BASE, ITEM, NODE
+        NOTHING, BASE, ITEM
     }
     private var previousTouch = PreviousTouch.NOTHING
 
@@ -393,7 +393,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         for ( cyl in cylinders ) {
             cyl.bindData()
-            // @todo pass in nextPlane so we can indicate the body move plane via the handle
+            // @todo pass in nextPlane so we can indicate the body move plane via the handle color
             cyl.draw(cylinderProgram, state, preDragState)
         }
 
@@ -422,6 +422,10 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     private fun getCylinderById( id: Int) : Cylinder = cylinders.first { c -> c.id == id }
 
     private fun getNodeById( id: Int) : Node = nodes.first { n -> n.id == id }
+
+    private fun items() : List<Item> {
+        return cylinders + nodes
+    }
 
     fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
         val ray = Geometry.convertNormalized2DPointToRay(normalizedX, normalizedY, invertedViewProjectionMatrix )
@@ -457,14 +461,9 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             previousTouch = PreviousTouch.ITEM
             var axis: Axis? = null
 
-            if (touchedObject!!.type == TouchableObjectType.CYLINDER) {
-                axis = touchedObject!!.cylinder!!.element.axis()
-                previousMeshPoint = touchedObject!!.cylinder!!.point
-            }
-
-            if (touchedObject!!.type == TouchableObjectType.NODE) {
-                axis = touchedObject!!.node!!.element.axis()
-                previousMeshPoint = touchedObject!!.node!!.point
+            if (touchedObject!!.type == TouchableObjectType.CYLINDER || touchedObject!!.type == TouchableObjectType.NODE) {
+                axis = touchedObject!!.itemTouch!!.element.axis()
+                previousMeshPoint = touchedObject!!.itemTouch!!.point
             }
 
             // if we touched a handle, switch to the correct plane
@@ -499,51 +498,29 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.SINGLE ) {
-                if ( touchedObject!!.type == TouchableObjectType.CYLINDER )
-                {
-                    val selectedCyl = cylinders.find { cylinder -> cylinder.selected  }
-                    if ( selectedCyl == touchedObject!!.cylinder!!.cylinder ) {
+                val selectedItem = items().find { i -> i.selected }
+                if ( selectedItem == touchedObject!!.itemTouch!!.item ) {
 
-                        // note that touching a handle will immediately reset nextPlane as required
-                        nextPlane = nextPlane!!.nextAxis()
+                    // note that touching a handle will immediately reset nextPlane as required
+                    nextPlane = nextPlane!!.nextAxis()
 
-                    }
-                    else {
-                        clearSelections()
-                        touchedObject!!.cylinder!!.cylinder.selected = true
-                    }
                 }
-                else if ( touchedObject!!.type == TouchableObjectType.NODE )
-                {
-                    val selectedNode = nodes.find { n -> n.selected  }
-                    Log.d( TAG, "selectedNode $selectedNode")
-                    if ( selectedNode == touchedObject!!.node!!.node ) {
-
-                        // not much point in this since nodes ain't got no body
-                        nextPlane = nextPlane!!.nextAxis()
-
-                    }
-                    else {
-                        clearSelections()
-                        touchedObject!!.node!!.node.selected = true
-                    }
+                else {
+                    clearSelections()
+                    touchedObject!!.itemTouch!!.item.selected = true
                 }
             }
             else if ( state == State.GROUP ) {
-                if ( touchedObject!!.type == TouchableObjectType.CYLINDER ) {
-                    if (touchedObject!!.cylinder!!.cylinder.selected)
+                if ( touchedObject!!.type == TouchableObjectType.CYLINDER || touchedObject!!.type == TouchableObjectType.NODE ) {
+                    if (touchedObject!!.itemTouch!!.item.selected)
                         nextPlane = nextPlane!!.nextAxis()
                     else
-                        touchedObject!!.cylinder!!.cylinder.selected = true
+                        touchedObject!!.itemTouch!!.item.selected = true
                 }
             }
             else if ( state == State.SELECT ) {
-                if ( touchedObject!!.type == TouchableObjectType.CYLINDER ) {
-                    touchedObject!!.cylinder!!.cylinder.selected = true
-                    state = State.SINGLE
-                }
-                else if ( touchedObject!!.type == TouchableObjectType.NODE ) {
-                    touchedObject!!.node!!.node.selected = true
+                if ( touchedObject!!.type == TouchableObjectType.CYLINDER || touchedObject!!.type == TouchableObjectType.NODE ) {
+                    touchedObject!!.itemTouch!!.item.selected = true
                     state = State.SINGLE
                 }
             }
@@ -559,10 +536,10 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         preDragState = state
 
-        if ( touchedObject?.type == TouchableObjectType.CYLINDER && touchedObject!!.cylinder!!.cylinder.selected
+        if ( touchedObject?.type == TouchableObjectType.CYLINDER && touchedObject!!.itemTouch!!.item.selected
             && ( state == State.SINGLE || state == State.GROUP ) )
         {
-            val element = touchedObject!!.cylinder!!.element
+            val element = touchedObject!!.itemTouch!!.element
 
             // before we start a move, we have to check the selected cylinder(s) for nodes;
             // any cylinder joined to a node prevents that end of the cylinder being moved.
@@ -578,7 +555,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                 Log.d( TAG, "No move, locked cylinder(s) selected")
 
         }
-        else if ( touchedObject?.type == TouchableObjectType.NODE && touchedObject!!.node!!.node.selected
+        else if ( touchedObject?.type == TouchableObjectType.NODE && touchedObject!!.itemTouch!!.item.selected
             && ( state == State.SINGLE || state == State.GROUP ) )
         {
             state = State.MOVE
@@ -603,7 +580,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             // change touchedObject to emulate a click on the top Z handle of the new cylinder
             previousMeshPoint = snapHandle!!.translateY( 0.01f )
             touchedObject = TouchedObject( TouchableObjectType.CYLINDER,
-                Cylinder.CylinderTouch( cylinder, previousMeshPoint!!, Cylinder.CylinderElement.TOP_Z ),
+                Item.ItemTouch( cylinder, previousMeshPoint!!, Item.ItemElement.TOP_Z ),
                 )
         }
         else {
@@ -612,7 +589,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     }
 
-    private fun checkForCongruency(element: Cylinder.CylinderElement, cylinder: Cylinder, other: Cylinder) {
+    private fun checkForCongruency(element: Item.ItemElement, cylinder: Cylinder, other: Cylinder) {
 
         // we're moving one end of the cylinder or the whole thing ie both ends. We want to know
         // when one of the moving ends come into congruence with an existing cylinder, by which we
@@ -760,7 +737,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                 {
                     if ( touchedObject!!.type == TouchableObjectType.CYLINDER )
                     {
-                        val element = touchedObject!!.cylinder!!.element
+                        val element = touchedObject!!.itemTouch!!.element
 
                         // apply the offsets to all other selected objects.
                         for (cylinder in cylinders.filter { cyl -> cyl.selected } ) {
@@ -823,14 +800,14 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     fun handleLongPress() {
         if ( previousTouch == PreviousTouch.ITEM ) {
-            if ( state == State.GROUP && touchedObject!!.cylinder!!.cylinder.selected ) {
-                touchedObject!!.cylinder!!.cylinder.selected = false
+            if ( state == State.GROUP && touchedObject!!.itemTouch!!.item.selected ) {
+                touchedObject!!.itemTouch!!.item.selected = false
                 val count = cylinders.filter { cyl -> cyl.selected }.size
                 if ( count == 0 )
                     state = State.SELECT
             }
             else if ( state == State.SINGLE || state == State.SELECT || state == State.GROUP ) {
-                touchedObject!!.cylinder!!.cylinder.selected = true
+                touchedObject!!.itemTouch!!.item.selected = true
                 state = State.GROUP
             }
             mesh = null
