@@ -4,7 +4,6 @@ import android.opengl.GLES20.GL_TRIANGLES
 import android.opengl.GLES20.GL_UNSIGNED_BYTE
 import android.opengl.GLES20.glDrawElements
 import com.ickphum.armature.data.VertexArray
-import com.ickphum.armature.programs.SkyboxShaderProgram
 import java.nio.ByteBuffer
 
 
@@ -52,7 +51,7 @@ class Skybox {
         )
         .position( 0 )
 
-    fun bindData(skyboxProgram: SkyboxShaderProgram) {
+    fun bindData() {
         vertexArray.setVertexAttribPointer(
             0,
             0,

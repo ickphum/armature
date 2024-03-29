@@ -4,7 +4,6 @@ import android.opengl.GLES20
 import com.ickphum.armature.Constants.POSITION_COMPONENT_COUNT
 import com.ickphum.armature.data.VertexArray
 import com.ickphum.armature.enum.Axis
-import com.ickphum.armature.programs.LineShaderProgram
 import com.ickphum.armature.util.Geometry
 
 class Line (size: Float, private val axis: Axis, private var point: Geometry.Point ){
@@ -13,7 +12,7 @@ class Line (size: Float, private val axis: Axis, private var point: Geometry.Poi
     }
 
     private val vertexData = FloatArray( POSITION_COMPONENT_COUNT * 2 )
-    private lateinit var vertexArray: VertexArray
+    private var vertexArray: VertexArray
 
     init {
         val otherAxes = axis.otherAxes()
@@ -31,7 +30,7 @@ class Line (size: Float, private val axis: Axis, private var point: Geometry.Poi
         vertexData
     }
 
-    fun bindData(program: LineShaderProgram) {
+    fun bindData() {
         vertexArray.setVertexAttribPointer(0,0, POSITION_COMPONENT_COUNT, 0 )
     }
 

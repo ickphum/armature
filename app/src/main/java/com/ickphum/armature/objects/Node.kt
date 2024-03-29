@@ -81,9 +81,11 @@ class Node (private var center: Geometry.Point, private val radius: Float, id1 :
             if ( handleHit != null )
             {
                 val nodeElement =
-                    if ( handleHit.element == Handle.HandleElement.X ) NodeElement.X
-                    else if ( handleHit.element == Handle.HandleElement.Y ) NodeElement.Y
-                    else NodeElement.Z
+                    when (handleHit.element) {
+                        Handle.HandleElement.X -> NodeElement.X
+                        Handle.HandleElement.Y -> NodeElement.Y
+                        else -> NodeElement.Z
+                    }
                 return NodeTouch( this, handleHit.point, nodeElement )
             }
         }

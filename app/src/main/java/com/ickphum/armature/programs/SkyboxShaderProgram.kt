@@ -6,7 +6,6 @@ import android.opengl.GLES20.GL_TEXTURE0
 import android.opengl.GLES20.GL_TEXTURE_CUBE_MAP
 import android.opengl.GLES20.glActiveTexture
 import android.opengl.GLES20.glBindTexture
-import android.opengl.GLES20.glGetAttribLocation
 import android.opengl.GLES20.glGetUniformLocation
 import android.opengl.GLES20.glUniform1i
 import android.opengl.GLES20.glUniformMatrix4fv

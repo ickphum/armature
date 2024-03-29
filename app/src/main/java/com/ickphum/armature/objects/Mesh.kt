@@ -4,7 +4,6 @@ import android.opengl.GLES20
 import com.ickphum.armature.Constants.POSITION_COMPONENT_COUNT
 import com.ickphum.armature.data.VertexArray
 import com.ickphum.armature.enum.Axis
-import com.ickphum.armature.programs.MeshShaderProgram
 import com.ickphum.armature.util.Geometry
 import kotlin.math.floor
 
@@ -16,11 +15,11 @@ class Mesh (private val size: Float, private val axis: Axis, private var positio
 
     private var snapGridSize = 0.5f
     private var snapGridDim = 4
-    var snapToGrid = true
+    private var snapToGrid = true
 
     private val vertexData = FloatArray( ( MESH_CORNERS + snapGridDim * snapGridDim ) * POSITION_COMPONENT_COUNT )
-    private lateinit var vertexArray: VertexArray
-    private lateinit var plane: Geometry.Plane
+    private var vertexArray: VertexArray
+    private var plane: Geometry.Plane
     private var snapPoints = mutableListOf<Geometry.Point>( )
 
     init {
@@ -54,7 +53,7 @@ class Mesh (private val size: Float, private val axis: Axis, private var positio
 
     }
 
-    fun calcSnapPoints( reference: Geometry.Point ) {
+    private fun calcSnapPoints(reference: Geometry.Point ) {
         snapPoints.clear()
 
         // we want to find the grid point immediately toward the origin from the reference point.
@@ -94,7 +93,7 @@ class Mesh (private val size: Float, private val axis: Axis, private var positio
             snapGridDim * snapGridDim * POSITION_COMPONENT_COUNT, )
     }
 
-    fun bindData(program: MeshShaderProgram) {
+    fun bindData() {
         vertexArray.setVertexAttribPointer(
             0,
             0,

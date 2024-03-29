@@ -321,7 +321,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         skyboxProgram.useProgram()
         skyboxProgram.setUniforms(modelViewProjectionMatrix, skyboxTexture)
-        skybox.bindData(skyboxProgram)
+        skybox.bindData()
         glDepthFunc(GL_LEQUAL);
         skybox.draw()
         glDepthFunc(GL_LESS);
@@ -344,20 +344,20 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         meshProgram.useProgram()
 
         meshProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0f, 0.2f + 0.2f * pct, 0.1f )
-        base.bindData(meshProgram)
+        base.bindData()
         base.draw()
 
         if ( mesh != null ) {
 
             // while a mesh is displayed, we can't be in SELECT so pct is not changing
             meshProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0.3f, 0.2f, 0.1f )
-            mesh!!.bindData(meshProgram)
+            mesh!!.bindData()
             mesh!!.draw()
         }
 
         meshProgram.setUniforms( modelViewProjectionMatrix, currentTime, 0.1f, 0.3f, 0.2f )
         for (congruency in congruencies.filter { c -> c.mesh != null } ) {
-            congruency.mesh!!.bindData( meshProgram )
+            congruency.mesh!!.bindData()
             congruency.mesh!!.draw()
         }
 
@@ -376,7 +376,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         lineProgram.setUniforms( modelViewProjectionMatrix, 0f, 0.8f, 0.1f )
 
         for (congruency in congruencies.filter { c -> c.line != null } ) {
-            congruency.line!!.bindData( lineProgram )
+            congruency.line!!.bindData()
             congruency.line!!.draw()
         }
     }
@@ -653,17 +653,29 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             // Since we're going to check the list of new congruencies for duplicates against
             // existing congruencies anyway, there's no point in checking they're not NONE
             // at this point
-            newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.bottomCenter), true, false ) )
+            newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.bottomCenter),
+                fromTop = true,
+                toTop = false
+            ) )
             if (!other.selected)
-                newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.topCenter),  true, true ) )
+                newCongruencies.add( TempCongruentPoint( cylinder.topCenter, cylinder.topCenter.findCongruency(other.topCenter),
+                    fromTop = true,
+                    toTop = true
+                ) )
         }
 
         // ditto for bottom
         if ( element.bottom() )
         {
-            newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.topCenter), false, true ) )
+            newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.topCenter),
+                fromTop = false,
+                toTop = true
+            ) )
             if (!other.selected)
-                newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.bottomCenter), false, false ) )
+                newCongruencies.add( TempCongruentPoint( cylinder.bottomCenter, cylinder.bottomCenter.findCongruency(other.bottomCenter),
+                    fromTop = false,
+                    toTop = false
+                ) )
         }
 
         // we now have either 1, 2 or 4 potential new congruencies; filter out NONEs

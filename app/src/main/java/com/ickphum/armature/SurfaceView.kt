@@ -25,7 +25,6 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
     private var touchTime = 0L
     private var touchDownX = 0f
     private var touchDownY = 0f
-    private var touchInterceptType = -1
     private var dragging = false
     private var gotLongPress = false
 
@@ -61,7 +60,7 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
                 previousX = x
                 previousY = y
 
-                touchTime = System.nanoTime();
+                touchTime = System.nanoTime()
                 touchDownX = x
                 touchDownY = y
                 dragging = false
