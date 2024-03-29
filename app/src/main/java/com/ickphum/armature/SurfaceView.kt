@@ -70,26 +70,23 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
                     val rc = renderer.handleTouchDown( normalizedX, normalizedY )
 //                    Log.d( TAG, "touch down rc $rc")
 
-                    // don't start the long press timer if we didn't tap on an item or node
-                    if ( rc > 0 ) {
-
+                    // don't give feedback timer if we didn't tap on an item or node
+                    if ( rc > 0 )
                         performHapticFeedback( HapticFeedbackConstants.VIRTUAL_KEY )
 
-                        timer = Timer( true )
-                        timer!!.schedule(object : TimerTask() {
-                            override fun run() {
-                                Log.d( TAG, "Timer run")
-                                queueEvent(Runnable {
-                                    renderer.handleLongPress()
-                                })
-                                performHapticFeedback( HapticFeedbackConstants.LONG_PRESS )
-                                timer = null
-                                gotLongPress = true
-                            }
-                        }, LONG_PRESS_TIME)
-                    }
-                    else
-                        timer = null
+                    timer = Timer( true )
+                    timer!!.schedule(object : TimerTask() {
+                        override fun run() {
+                            Log.d( TAG, "Timer expired")
+                            queueEvent(Runnable {
+                                renderer.handleLongPress()
+                            })
+                            performHapticFeedback( HapticFeedbackConstants.LONG_PRESS )
+                            timer = null
+                            gotLongPress = true
+                        }
+                    }, LONG_PRESS_TIME)
+
                 })
             }
 

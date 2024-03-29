@@ -46,6 +46,7 @@ import com.ickphum.armature.objects.Icosahedron
 import com.ickphum.armature.objects.Item
 import com.ickphum.armature.objects.Line
 import com.ickphum.armature.objects.Mesh
+import com.ickphum.armature.objects.Model
 import com.ickphum.armature.objects.Node
 import com.ickphum.armature.objects.Skybox
 import com.ickphum.armature.programs.CylinderShaderProgram
@@ -184,7 +185,6 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     private var previousTouch = PreviousTouch.NOTHING
 
     private lateinit var cylinderProgram: CylinderShaderProgram
-    private val cylinders = mutableListOf<Cylinder>( )
 
     private lateinit var lineProgram: LineShaderProgram
 
@@ -212,9 +212,8 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     }
     private val congruencies = mutableListOf<CongruentPoint>()
 
-    private val nodes = mutableListOf<Node>()
+    private val model = Model()
 
-//     private var testIco : Icosahedron? = null
     private var testHandle : Handle? = null
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
@@ -383,7 +382,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private fun drawCylinders() {
 
-        if ( cylinders.size == 0 ) return
+        if (model.items().isEmpty()) return
 
         setIdentityM(modelMatrix, 0);
         updateMvpMatrix();
@@ -391,13 +390,13 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         cylinderProgram.useProgram()
         cylinderProgram.setUniforms( modelViewProjectionMatrix, vectorToLight )
 
-        for ( cyl in cylinders ) {
+        for ( cyl in model.cylinders() ) {
             cyl.bindData()
             // @todo pass in nextPlane so we can indicate the body move plane via the handle color
             cyl.draw(cylinderProgram, state, preDragState)
         }
 
-        for ( node in nodes ) {
+        for ( node in model.nodes() ) {
             node.draw( cylinderProgram, state, preDragState )
         }
 
@@ -410,23 +409,6 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         glDisable(GL_BLEND)
     }
 
-    private fun clearSelections() {
-        for (cyl in cylinders) {
-            cyl.selected = false;
-        }
-        for (node in nodes) {
-            node.selected = false;
-        }
-    }
-
-    private fun getCylinderById( id: Int) : Cylinder = cylinders.first { c -> c.id == id }
-
-    private fun getNodeById( id: Int) : Node = nodes.first { n -> n.id == id }
-
-    private fun items() : List<Item> {
-        return cylinders + nodes
-    }
-
     fun handleTouchDown(normalizedX: Float, normalizedY: Float) : Int {
         val ray = Geometry.convertNormalized2DPointToRay(normalizedX, normalizedY, invertedViewProjectionMatrix )
 
@@ -434,7 +416,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         var maxZ : Float? = null
 
-        for (item in items() ) {
+        for (item in model.items() ) {
             val hit = item.findIntersectionPoint( ray, modelViewMatrix )
             if ( hit != null ) {
                 val newMax = Geometry.compareTouchedPoint( hit.point, maxZ, modelViewMatrix )
@@ -486,7 +468,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.SINGLE ) {
-                val selectedItem = items().find { i -> i.selected }
+                val selectedItem = model.findSelected()
                 if ( selectedItem == touchedObject!!.itemTouch!!.item ) {
 
                     // note that touching a handle will immediately reset nextPlane as required
@@ -494,7 +476,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
                 }
                 else {
-                    clearSelections()
+                    model.clearSelections()
                     touchedObject!!.itemTouch!!.item.selected = true
                 }
             }
@@ -515,7 +497,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             mesh = null
         }
         else if ( previousTouch == PreviousTouch.NOTHING ) {
-            clearSelections()
+            model.clearSelections()
             state = State.SELECT
         }
     }
@@ -531,7 +513,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
             // before we start a move, we have to check the selected cylinder(s) for nodes;
             // any cylinder joined to a node prevents that end of the cylinder being moved.
-            if ( items().none { i -> i.thisMoveBlocked( element )})
+            if ( model.items().none { i -> i.thisMoveBlocked( element )})
             {
                 state = State.MOVE
                 snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )
@@ -555,7 +537,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
             // add a new item
             val cylinder = Cylinder(snapHandle!!, snapHandle!!.translateY( 0.01f ), DEFAULT_ITEM_RADIUS )
-            cylinders.add(cylinder)
+            model.addCylinder( cylinder )
 
             preDragState = State.SINGLE
             state = State.MOVE
@@ -687,7 +669,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                 // change the congruency type and assign the node id as the target
                 newC.congruency = Congruency.EXISTING_NODE
                 otherId = if ( newC.toTop ) other.topNode!! else other.bottomNode!!
-                getNodeById( otherId ).highlighted = true
+                model.getNodeById( otherId ).highlighted = true
             }
 
             congruencies.add( CongruentPoint( newC.point, newC.congruency, cylinder.id, newC.fromTop, otherId, newC.toTop )  )
@@ -726,18 +708,18 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                         val element = touchedObject!!.itemTouch!!.element
 
                         // apply the offsets to all other selected objects.
-                        for (cylinder in cylinders.filter { cyl -> cyl.selected } ) {
+                        for (cylinder in model.selectedCylinders() ) {
                             cylinder.changePosition( if (element.top()) delta else null, if (element.bottom()) delta else null )
                         }
 
                         // check for congruencies, ie shared points/lines/planes
                         congruencies.clear()
-                        for (node in nodes)
+                        for (node in model.nodes())
                             node.highlighted = false
-                        for (cylinder in cylinders.filter { c -> c.selected } ) {
+                        for (cylinder in model.selectedCylinders() ) {
 
                             // check against all other cylinders
-                            for (other in cylinders.filter { o -> o !== cylinder } ) {
+                            for (other in model.cylinders().filter { o -> o !== cylinder } ) {
 
                                 // only check the moving end; both ends move when selection == BODY
                                 checkForCongruency( element, cylinder, other )
@@ -748,10 +730,10 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                     else if ( touchedObject!!.type == TouchableObjectType.NODE )
                     {
                         // apply the offsets to all other selected objects.
-                        for (node in nodes.filter { n -> n.selected } ) {
+                        for (node in model.selectedNodes() ) {
                             node.changePosition( delta )
                             for ( id in node.cylinderIds )
-                                getCylinderById( id ).changePositionByNode( delta, node.id )
+                                model.getCylinderById( id ).changePositionByNode( delta, node.id )
                         }
                     }
                 }
@@ -766,20 +748,20 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         mesh = null
         state = preDragState
         for ( point in congruencies.filter { it.congruency == Congruency.EXISTING_NODE } ) {
-            val node = getNodeById( point.to )
+            val node = model.getNodeById( point.to )
             node.addCylinder( point.from )
-            getCylinderById( point.from ).setNode( node, point.fromTop)
+                model.getCylinderById( point.from ).setNode( node, point.fromTop)
             Log.d( TAG, "Join to node $node from ${point.from}/${point.fromTop} to Node ${point.to} ")
         }
         for ( point in congruencies.filter { it.congruency == Congruency.SAME_POINT } ) {
             val node = Node( point.point, NODE_RADIUS, point.from, point.to )
-            nodes.add( node )
-            getCylinderById( point.from ).setNode( node, point.fromTop)
-            getCylinderById( point.to ).setNode( node, point.toTop)
+            model.addNode( node )
+            model.getCylinderById( point.from ).setNode( node, point.fromTop)
+            model.getCylinderById( point.to ).setNode( node, point.toTop)
             Log.d( TAG, "Create node $node from ${point.from}/${point.fromTop} to ${point.to}/${point.toTop} ")
         }
         congruencies.clear()
-        for (node in nodes)
+        for (node in model.nodes())
             node.highlighted = false
 
     }
@@ -788,7 +770,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         if ( previousTouch == PreviousTouch.ITEM ) {
             if ( state == State.GROUP && touchedObject!!.itemTouch!!.item.selected ) {
                 touchedObject!!.itemTouch!!.item.selected = false
-                val count = cylinders.filter { cyl -> cyl.selected }.size
+                val count = model.selectedItems().size
                 if ( count == 0 )
                     state = State.SELECT
             }
@@ -798,16 +780,17 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             }
             mesh = null
         }
+        else if ( previousTouch == PreviousTouch.NOTHING )
+        {
+            Log.d( TAG, "Nothing long")
+            model.clear()
+        }
     }
 
 }
 
 /*
 TODO
-
-Create Item class to combine Cylinder and Node interfaces
-Create Model class to hold cylinders, nodes, etc
-Group selection/handling for Nodes (after Item exists)
 
 + UI changes;
 on screen buttons for undo, settings, save/load etc
