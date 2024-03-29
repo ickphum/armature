@@ -78,8 +78,12 @@ abstract class Item ( var selected: Boolean = true ){
 
     var id = nextIndex()
 
-    abstract fun canMove() : Boolean
+    abstract val touchableType : Renderer.TouchableObjectType
+
+    abstract fun thisMoveBlocked(element: ItemElement ) : Boolean
 
     abstract fun draw(cylinderProgram: CylinderShaderProgram, state : Renderer.State, preDragState: Renderer.State)
+
+    abstract fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch?
 
 }

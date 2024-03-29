@@ -13,6 +13,8 @@ class Node (private var center: Geometry.Point, private val radius: Float, id1 :
         Log.d(TAG, "Create node $id")
     }
 
+    override val touchableType = Renderer.TouchableObjectType.NODE
+
     val cylinderIds = mutableSetOf( id1, id2 )
 
     var highlighted = false
@@ -25,7 +27,7 @@ class Node (private var center: Geometry.Point, private val radius: Float, id1 :
     private val normalColor = floatArrayOf(0f, 0.5f, 0.8f, 1f)
     private val highlightColor = floatArrayOf(0f, 1f, 0f, 1f)
 
-    override fun canMove() = true
+    override fun thisMoveBlocked(element: ItemElement ) = false
 
     override fun draw(cylinderProgram: CylinderShaderProgram, state : Renderer.State, preDragState: Renderer.State) {
 
@@ -48,7 +50,7 @@ class Node (private var center: Geometry.Point, private val radius: Float, id1 :
 
     fun addCylinder( id: Int ) = cylinderIds.add( id )
 
-    fun findIntersectionPoint( ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch? {
+    override fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch? {
         if ( selected )
         {
             // the handle is displayed so pass off detection to that

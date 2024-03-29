@@ -184,7 +184,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     private var previousTouch = PreviousTouch.NOTHING
 
     private lateinit var cylinderProgram: CylinderShaderProgram
-    private var cylinders = mutableListOf<Cylinder>( )
+    private val cylinders = mutableListOf<Cylinder>( )
 
     private lateinit var lineProgram: LineShaderProgram
 
@@ -434,25 +434,13 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
         var maxZ : Float? = null
 
-        for (node in nodes ) {
-            val nodeHit = node.findIntersectionPoint( ray, modelViewMatrix )
-            if ( nodeHit != null )
-            {
-                val newMax = Geometry.compareTouchedPoint( nodeHit.point, maxZ, modelViewMatrix )
+        for (item in items() ) {
+            val hit = item.findIntersectionPoint( ray, modelViewMatrix )
+            if ( hit != null ) {
+                val newMax = Geometry.compareTouchedPoint( hit.point, maxZ, modelViewMatrix )
                 if ( newMax !== null ) {
                     maxZ = newMax
-                    touchedObject = TouchedObject( TouchableObjectType.NODE, nodeHit )
-                }
-            }
-        }
-
-        for (cyl in cylinders) {
-            val cylinderHit = cyl.findIntersectionPoint( ray, modelViewMatrix )
-            if ( cylinderHit != null ) {
-                val newMax = Geometry.compareTouchedPoint( cylinderHit.point, maxZ, modelViewMatrix )
-                if ( newMax !== null ) {
-                    maxZ = newMax
-                    touchedObject = TouchedObject( TouchableObjectType.CYLINDER, cylinderHit )
+                    touchedObject = TouchedObject( item.touchableType, hit )
                 }
             }
         }
@@ -543,9 +531,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
             // before we start a move, we have to check the selected cylinder(s) for nodes;
             // any cylinder joined to a node prevents that end of the cylinder being moved.
-            val topNodes = cylinders.any { c -> c.selected && c.topNode != null }
-            val bottomNodes = cylinders.any { c -> c.selected && c.bottomNode != null }
-            if ( (!topNodes || !element.top() ) && ( !bottomNodes || !element.bottom() ) )
+            if ( items().none { i -> i.thisMoveBlocked( element )})
             {
                 state = State.MOVE
                 snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )

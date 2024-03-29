@@ -47,12 +47,9 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         private const val HANDLE_SEGMENTS = 24
         private const val NUMBER_HANDLE_VERTICES = HANDLE_SEGMENTS + 2
 
-//        private var classIndex = 0
-//        fun nextIndex() = classIndex++
-//        fun resetIndex(index : Int ) = run { classIndex = index }
     }
 
-//    var id = nextIndex()
+    override val touchableType = Renderer.TouchableObjectType.CYLINDER
 
     // we draw the cylinder vertically to the height matching the distance between top
     // bottom, then rotate it so that lines up with the actual topCenter
@@ -317,7 +314,9 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         vertexArray.setVertexAttribPointer( POSITION_COMPONENT_COUNT,1, NORMAL_COMPONENT_COUNT, STRIDE )
     }
 
-    override fun canMove() = true
+    override fun thisMoveBlocked(element: ItemElement ): Boolean {
+        return ( element.top() && topNode != null ) || ( element.bottom() && bottomNode != null )
+    }
 
     override fun draw(program: CylinderShaderProgram, state : State, preDragState: State) {
 
@@ -359,7 +358,7 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
 
     }
 
-    fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch? {
+    override fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch? {
 
         val intersections = mutableListOf<ItemTouch>()
 
