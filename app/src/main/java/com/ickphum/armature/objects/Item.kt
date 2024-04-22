@@ -86,4 +86,6 @@ abstract class Item ( var selected: Boolean = true ){
 
     abstract fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch?
 
+    abstract fun toJson() : String
+
 }

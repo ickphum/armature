@@ -57,6 +57,7 @@ import com.ickphum.armature.util.Geometry
 import com.ickphum.armature.util.TextureHelper
 import glm_.glm
 import glm_.vec3.Vec3
+import kotlinx.serialization.json.Json
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.floor
 import kotlin.math.sin
@@ -492,6 +493,14 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
                 if ( touchedObject!!.type == TouchableObjectType.CYLINDER || touchedObject!!.type == TouchableObjectType.NODE ) {
                     touchedObject!!.itemTouch!!.item.selected = true
                     state = State.SINGLE
+
+                    // this is how to serialize an object
+                    if ( touchedObject!!.type == TouchableObjectType.CYLINDER ) {
+                        val json = touchedObject!!.itemTouch!!.item.toJson()
+                        Log.d(TAG, "New cylinder $json")
+                        val cj = Json.decodeFromString<Cylinder.CylinderJSON>( json )
+                        Log.d( TAG, "cj $cj")
+                    }
                 }
             }
             mesh = null
@@ -750,7 +759,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
         for ( point in congruencies.filter { it.congruency == Congruency.EXISTING_NODE } ) {
             val node = model.getNodeById( point.to )
             node.addCylinder( point.from )
-                model.getCylinderById( point.from ).setNode( node, point.fromTop)
+            model.getCylinderById( point.from ).setNode( node, point.fromTop)
             Log.d( TAG, "Join to node $node from ${point.from}/${point.fromTop} to Node ${point.to} ")
         }
         for ( point in congruencies.filter { it.congruency == Congruency.SAME_POINT } ) {

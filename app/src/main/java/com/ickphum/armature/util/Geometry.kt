@@ -5,6 +5,7 @@ import com.ickphum.armature.Renderer
 import com.ickphum.armature.enum.Axis
 import glm_.quat.Quat
 import glm_.vec3.Vec3
+import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -13,6 +14,7 @@ import kotlin.math.sqrt
 
 class Geometry {
 
+    @Serializable
     class Point(var x: Float, var y: Float, var z: Float) {
 
         constructor( data: FloatArray, offset: Int ) : this( data[ offset], data[ offset + 1], data[ offset + 2 ])
@@ -393,4 +395,5 @@ class Geometry {
         }
 
     }
+
 }

@@ -48,6 +48,8 @@ class Node (private var center: Geometry.Point, private val radius: Float, id1 :
         }
     }
 
+    override fun toJson() = "Node JSON TBD"
+
     fun addCylinder( id: Int ) = cylinderIds.add( id )
 
     override fun findIntersectionPoint(ray: Geometry.Ray, modelViewMatrix: FloatArray): ItemTouch? {

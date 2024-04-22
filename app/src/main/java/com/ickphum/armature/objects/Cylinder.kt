@@ -15,6 +15,9 @@ import com.ickphum.armature.util.Geometry.Helper.vectorBetween
 import glm_.glm.angle
 import glm_.glm.angleAxis
 import glm_.vec3.Vec3
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point, private val radius: Float ) : Item() {
 
@@ -86,6 +89,14 @@ class Cylinder (var bottomCenter: Geometry.Point, var topCenter: Geometry.Point,
         val center: Geometry.Point,
         val element: ItemElement
     )
+
+    @Serializable
+    data class CylinderJSON (val bottom: Geometry.Point, val top: Geometry.Point, val height: Float, val topNode: Int?, val bottomNode: Int? )
+
+    override fun toJson(): String {
+        val cylinderJSON = CylinderJSON( bottomCenter, topCenter, height, topNode, bottomNode)
+        return Json.encodeToString( cylinderJSON )
+    }
 
     override fun toString() = "Cylinder $id"
 
