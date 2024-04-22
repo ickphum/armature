@@ -44,6 +44,17 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
 //        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
 
     }
+
+    override fun onPause() {
+        Log.d( TAG, "onPause")
+        super.onPause()
+    }
+
+    override fun onResume() {
+        Log.d( TAG, "onResume")
+        super.onResume()
+    }
+
     override fun onTouchEvent(e: MotionEvent): Boolean {
         // MotionEvent reports input details from the touch screen
         // and other input controls. In this case, you are only
