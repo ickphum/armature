@@ -16,15 +16,20 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light"
         tools:targetApi="31">
         <activity
             android:name=".SettingsActivity"
+            android:configChanges="orientation|screenSize"
+
             android:parentActivityName=".MainActivity"
             android:exported="false"
             android:label="@string/title_activity_settings" />
         <activity
+            android:configChanges="orientation|screenSize"
+
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/title_activity_main"

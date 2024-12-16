@@ -1,35 +1,66 @@
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    app:title="Prefs">
 
-    <PreferenceCategory app:title="@string/messages_header">
+    <PreferenceCategory
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:title="@string/sizes_header">
 
         <EditTextPreference
-            app:key="signature"
-            app:title="@string/signature_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:defaultValue="0.3"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="@string/item_radius"
+            app:key="@string/item_radius_key"
             app:useSimpleSummaryProvider="true" />
-
-        <ListPreference
-            app:defaultValue="reply"
-            app:entries="@array/reply_entries"
-            app:entryValues="@array/reply_values"
-            app:key="reply"
-            app:title="@string/reply_title"
+        <EditTextPreference
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:defaultValue="0.65"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="@string/node_radius"
+            app:key="@string/node_radius_key"
             app:useSimpleSummaryProvider="true" />
-
     </PreferenceCategory>
+    <PreferenceCategory
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:title="@string/grid_header">
 
-    <PreferenceCategory app:title="@string/sync_header">
-
-        <SwitchPreferenceCompat
-            app:key="sync"
-            app:title="@string/sync_title" />
-
-        <SwitchPreferenceCompat
-            app:dependency="sync"
-            app:key="attachment"
-            app:summaryOff="@string/attachment_summary_off"
-            app:summaryOn="@string/attachment_summary_on"
-            app:title="@string/attachment_title" />
-
+        <SwitchPreference
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:defaultValue="true"
+            android:title="@string/show_grid_title"
+            app:key="@string/show_grid_key" />
+        <SwitchPreference
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:defaultValue="false"
+            android:title="@string/snap_grid_title"
+            app:key="@string/snap_grid_key" />
+        <EditTextPreference
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:defaultValue="10"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="@string/base_proportion"
+            app:key="@string/base_proportion_key"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:defaultValue="3"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="@string/cells_displayed"
+            app:key="@string/cells_displayed_key"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
 </PreferenceScreen>

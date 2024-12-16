@@ -11,6 +11,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.core.view.setPadding
+import androidx.preference.PreferenceManager
 
 private const val TAG = "MainActivity"
 
@@ -37,6 +38,10 @@ class MainActivity : Activity() {
         // as the ContentView for this Activity.
         surfaceView = SurfaceView(this)
         setContentView(surfaceView)
+
+        PreferenceManager.setDefaultValues(this, R.xml.root_preferences, false);
+
+//        setContentView( R.layout.settings )
 
         val params = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,

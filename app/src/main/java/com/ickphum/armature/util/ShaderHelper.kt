@@ -13,7 +13,6 @@ import android.opengl.GLES20.glCreateShader
 import android.opengl.GLES20.glDeleteProgram
 import android.opengl.GLES20.glDeleteShader
 import android.opengl.GLES20.glDetachShader
-import android.opengl.GLES20.glGetProgramInfoLog
 import android.opengl.GLES20.glGetProgramiv
 import android.opengl.GLES20.glGetShaderiv
 import android.opengl.GLES20.glLinkProgram
@@ -38,7 +37,7 @@ class ShaderHelper {
             val rawText = context.resources.openRawResource( sourceResourceId )
 //            val rawText = context.assets.open(sourceFileName)
             val shaderString = rawText.bufferedReader().use { it.readText() }
-            Log.w( TAG, shaderString )
+//            Log.w( TAG, shaderString )
 
             glShaderSource(shaderObjectId, shaderString)
             glCompileShader(shaderObjectId)
@@ -88,12 +87,12 @@ class ShaderHelper {
             glValidateProgram(programObjectId)
             val validateStatus = IntArray(1)
             glGetProgramiv(programObjectId, GL_VALIDATE_STATUS, validateStatus, 0)
-            Log.v(
-                TAG, """
-     Results of validating program: ${validateStatus[0]}
-     Log:${glGetProgramInfoLog(programObjectId)}
-     """.trimIndent()
-            )
+//            Log.v(
+//                TAG, """
+//     Results of validating program: ${validateStatus[0]}
+//     Log:${glGetProgramInfoLog(programObjectId)}
+//     """.trimIndent()
+//            )
             return validateStatus[0] != 0
         }
 

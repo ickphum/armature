@@ -1,9 +1,11 @@
 package com.ickphum.armature.objects
 
 import android.opengl.GLES20
+import com.ickphum.armature.BASE_SIZE
 import com.ickphum.armature.Constants.POSITION_COMPONENT_COUNT
 import com.ickphum.armature.data.VertexArray
 import com.ickphum.armature.enum.Axis
+import com.ickphum.armature.getPref
 import com.ickphum.armature.util.Geometry
 import kotlin.math.floor
 
@@ -13,9 +15,10 @@ class Mesh (private val size: Float, private val axis: Axis, private var positio
         private const val MESH_CORNERS = 4
     }
 
-    private var snapGridSize = 0.5f
-    private var snapGridDim = 4
-    private var snapToGrid = true
+    private var snapGridSize = BASE_SIZE / ( getPref( "base_proportion") as String).toFloat()
+    private var snapGridDim = ( getPref( "cells_displayed") as String).toInt()
+    private var snapToGrid = getPref( "snap_grid") as Boolean
+    private var showGrid = getPref( "show_grid") as Boolean
 
     private val vertexData = FloatArray( ( MESH_CORNERS + snapGridDim * snapGridDim ) * POSITION_COMPONENT_COUNT )
     private var vertexArray: VertexArray
@@ -102,7 +105,8 @@ class Mesh (private val size: Float, private val axis: Axis, private var positio
     }
     fun draw() {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, MESH_CORNERS)
-        GLES20.glDrawArrays(GLES20.GL_POINTS, MESH_CORNERS, snapGridDim * snapGridDim )
+        if ( showGrid )
+            GLES20.glDrawArrays(GLES20.GL_POINTS, MESH_CORNERS, snapGridDim * snapGridDim )
     }
 
     fun findIntersectionPoint( ray: Geometry.Ray): Geometry.Point? {

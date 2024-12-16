@@ -1,17 +1,5 @@
 package com.ickphum.armature
 
-/*
-Plans
-
-Easily snap cylinder(s) back to a plane? Maybe fixed by snapping anyway?
-
-When adjusting an item, show guide planes when a moving end shares a coord with another item,
-and a guide line when 2 coords are shared
-
-Long press on a handle to change the build plane
-
- */
-
 import android.content.Context
 import android.opengl.GLES20.GL_BLEND
 import android.opengl.GLES20.GL_COLOR_BUFFER_BIT
@@ -39,6 +27,7 @@ import android.opengl.Matrix.translateM
 import android.opengl.Matrix.transposeM
 import android.os.SystemClock
 import android.util.Log
+import androidx.preference.PreferenceManager
 import com.ickphum.armature.enum.Axis
 import com.ickphum.armature.objects.Cylinder
 import com.ickphum.armature.objects.Handle
@@ -63,9 +52,18 @@ import kotlin.math.floor
 import kotlin.math.sin
 
 private const val TAG = "Renderer"
-private const val DEFAULT_ITEM_RADIUS = 0.3f
-private const val BASE_SIZE = 5f
-private const val NODE_RADIUS = 0.625f
+const val BASE_SIZE = 5f
+
+const val DEFAULT_NODE_RADIUS = 0.625f
+
+private var _prefs = mutableMapOf<String, Any?>()
+fun getPref( key: String ) : Any {
+    return if ( _prefs[key] == null ) "" else _prefs[ key ]!!
+}
+fun getPrefFloat( key: String, default: Float ) : Float {
+    val prefStr = _prefs[key]
+    return if ( prefStr == null ) default else ( prefStr as String ).toFloat()
+}
 
 class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
@@ -197,18 +195,22 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private var state = State.SELECT
     private var preDragState = State.SELECT
+    private var itemRadius = 0.3f
+    private var nodeRadius = DEFAULT_NODE_RADIUS
 
     data class CongruentPoint(val point: Geometry.Point, val congruency : Congruency, val from: Int, val fromTop: Boolean, val to: Int, val toTop: Boolean ) {
         var mesh : Mesh? = null
         var line : Line? = null
         var icosahedron: Icosahedron? = null
+        private val nodeRadius = getPrefFloat( "node_radius", DEFAULT_NODE_RADIUS )
+
         init {
             if ( congruency.meshRequired() )
                 mesh = Mesh( BASE_SIZE / 2f, congruency.axis(), point.asArray()[ congruency.axis().axis() ] )
             if ( congruency.lineRequired() )
                 line = Line(BASE_SIZE / 2f, congruency.axis(), point)
             if ( congruency === Congruency.SAME_POINT )
-                icosahedron = Icosahedron( point.asVector(), NODE_RADIUS )
+                icosahedron = Icosahedron( point.asVector(), nodeRadius )
         }
     }
     private val congruencies = mutableListOf<CongruentPoint>()
@@ -216,6 +218,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
     private val model = Model()
 
     private var testHandle : Handle? = null
+
 
     override fun onSurfaceCreated(glUnused: GL10?, p1: javax.microedition.khronos.egl.EGLConfig?) {
 
@@ -226,6 +229,20 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 //        glEnable(GL_CULL_FACE)
 
         Log.d( TAG, "************** version $version ******************")
+
+        _prefs.clear()
+        val preferences = PreferenceManager.getDefaultSharedPreferences(context).all
+        preferences.forEach {
+            Log.d(TAG, "${it.key} -> ${it.value}")
+            _prefs[it.key] = it.value
+        }
+
+        itemRadius = getPrefFloat( "item_radius", itemRadius )
+        nodeRadius = getPrefFloat( "node_radius", DEFAULT_NODE_RADIUS )
+
+//        val editor: SharedPreferences.Editor = PreferenceManager.getDefaultSharedPreferences(context).edit()
+//        editor.remove("attachment")
+//        editor.apply()
 
         globalStartTime = System.nanoTime();
 
@@ -522,7 +539,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
             // before we start a move, we have to check the selected cylinder(s) for nodes;
             // any cylinder joined to a node prevents that end of the cylinder being moved.
-            if ( model.items().none { i -> i.thisMoveBlocked( element )})
+            if ( model.selectedCylinders().none { i -> i.thisMoveBlocked( element )})
             {
                 state = State.MOVE
                 snapHandle = mesh!!.nearestSnapPoint( previousMeshPoint!! )
@@ -545,7 +562,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             prevHandleOffset = Geometry.Vector(0f, 0f ,0f)
 
             // add a new item
-            val cylinder = Cylinder(snapHandle!!, snapHandle!!.translateY( 0.01f ), DEFAULT_ITEM_RADIUS )
+            val cylinder = Cylinder(snapHandle!!, snapHandle!!.translateY( 0.01f ), itemRadius )
             model.addCylinder( cylinder )
 
             preDragState = State.SINGLE
@@ -556,9 +573,10 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
 
             // change touchedObject to emulate a click on the top Z handle of the new cylinder
             previousMeshPoint = snapHandle!!.translateY( 0.01f )
-            touchedObject = TouchedObject( TouchableObjectType.CYLINDER,
-                Item.ItemTouch( cylinder, previousMeshPoint!!, Item.ItemElement.TOP_Z ),
-                )
+            touchedObject = TouchedObject(
+                TouchableObjectType.CYLINDER,
+                Item.ItemTouch(cylinder, previousMeshPoint!!, Item.ItemElement.TOP_Z),
+            )
         }
         else {
             state = State.PANNING
@@ -763,7 +781,7 @@ class Renderer(private val context: Context) : GLSurfaceView.Renderer {
             Log.d( TAG, "Join to node $node from ${point.from}/${point.fromTop} to Node ${point.to} ")
         }
         for ( point in congruencies.filter { it.congruency == Congruency.SAME_POINT } ) {
-            val node = Node( point.point, NODE_RADIUS, point.from, point.to )
+            val node = Node( point.point, nodeRadius, point.from, point.to )
             model.addNode( node )
             model.getCylinderById( point.from ).setNode( node, point.fromTop)
             model.getCylinderById( point.to ).setNode( node, point.toTop)
@@ -808,5 +826,7 @@ save, load, clear models
 automatic joining of group selections
     For groups > 3, find closest neighbour
     cylinders - top/top, bottom/bottom, alternating.
+guide planes for node movement
+join 2 nodes (same as joining cylinders to create nodes)
 
  */

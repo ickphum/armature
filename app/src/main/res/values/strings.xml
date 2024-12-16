@@ -1,20 +1,28 @@
 <resources>
     <string name="app_name">Armature</string>
     <string name="title_activity_main">MainActivity</string>
-    <string name="title_activity_settings">SettingsActivity</string>
+    <string name="title_activity_settings">Settings</string>
 
     <!-- Preference Titles -->
-    <string name="messages_header">Messages</string>
-    <string name="sync_header">Sync</string>
+    <string name="grid_header">Grid</string>
+    <string name="sizes_header">Sizes</string>
 
-    <!-- Messages Preferences -->
-    <string name="signature_title">Your signature</string>
-    <string name="reply_title">Default reply action</string>
+    <!-- Grid Preferences -->
+    <string name="base_proportion">Number of cells across entire base</string>
+    <string name="cells_displayed">Side length of displayed grid</string>
+    <string name="snap_grid_title">Snap to grid</string>
+    <string name="show_grid_title">Show grid</string>
 
-    <!-- Sync Preferences -->
-    <string name="sync_title">Sync email periodically</string>
-    <string name="attachment_title">Download incoming attachments</string>
-    <string name="attachment_summary_on">Automatically download attachments for incoming emails
-    </string>
-    <string name="attachment_summary_off">Only download attachments when manually requested</string>
+    <string name="base_proportion_key" translatable="false">base_proportion</string>
+    <string name="cells_displayed_key" translatable="false">cells_displayed</string>
+    <string name="snap_grid_key" translatable="false">snap_grid</string>
+    <string name="show_grid_key" translatable="false">show_grid</string>
+
+    <!-- Size prefs -->
+    <string name="item_radius">Item radius</string>
+    <string name="node_radius">Node radius</string>
+
+    <string name="item_radius_key" translatable="false">item_radius</string>
+    <string name="node_radius_key" translatable="false">node_radius</string>
+
 </resources>

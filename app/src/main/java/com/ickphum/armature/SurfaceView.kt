@@ -40,6 +40,8 @@ class SurfaceView(context: Context) : GLSurfaceView(context) {
         // Set the Renderer for drawing on the GLSurfaceView
         setRenderer(renderer)
 
+        preserveEGLContextOnPause = true
+
         // Render the view only when there is a change in the drawing data.
 //        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
 
